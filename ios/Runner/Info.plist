@@ -53,6 +53,10 @@
 	<string>Precisamos da sua localização em segundo plano para rastrear suas entregas durante o transporte</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Precisamos da sua localização em segundo plano para rastrear suas entregas</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	
 	<!-- Camera and photo permissions -->
 	<key>NSCameraUsageDescription</key>

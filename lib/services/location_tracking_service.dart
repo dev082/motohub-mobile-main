@@ -7,7 +7,6 @@ import 'package:motohub/models/location_point.dart';
 import 'package:motohub/models/tracking_session.dart';
 import 'package:motohub/services/cache_service.dart';
 import 'package:motohub/supabase/supabase_config.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 /// Advanced location tracking service with adaptive intervals and battery optimization
 class LocationTrackingService {
@@ -92,27 +91,33 @@ class LocationTrackingService {
         return false;
       }
 
-      // Check location permission
-      var permission = await Permission.location.status;
-      if (permission.isDenied) {
-        permission = await Permission.location.request();
+      // Use Geolocator permission APIs (works better across platforms, including web).
+      var permission = await Geolocator.checkPermission();
+      debugPrint('Location permission status: $permission');
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        debugPrint('Location permission after request: $permission');
       }
 
-      if (permission.isPermanentlyDenied) {
+      if (permission == LocationPermission.deniedForever) {
         debugPrint('Location permission permanently denied');
-        await openAppSettings();
+        if (!kIsWeb) {
+          // On web there is no app settings page to open.
+          await Geolocator.openAppSettings();
+        }
         return false;
       }
 
-      // Request background location (Android)
-      if (!kIsWeb && permission.isGranted) {
-        var bgPermission = await Permission.locationAlways.status;
-        if (bgPermission.isDenied) {
-          bgPermission = await Permission.locationAlways.request();
-        }
+      // Best-effort attempt to upgrade to "always" on mobile if needed.
+      // (This depends on platform configuration and user choice.)
+      if (!kIsWeb && permission == LocationPermission.whileInUse) {
+        final upgraded = await Geolocator.requestPermission();
+        debugPrint('Location permission upgrade attempt: $upgraded');
+        permission = upgraded;
       }
 
-      return permission.isGranted;
+      return permission == LocationPermission.always || permission == LocationPermission.whileInUse;
     } catch (e) {
       debugPrint('Check permissions error: $e');
       return false;
@@ -174,7 +179,7 @@ class LocationTrackingService {
 
     try {
       _trackingTimer?.cancel();
-      _positionStream?.cancel();
+      await _positionStream?.cancel();
       
       // Complete tracking session
       if (_currentSessionId != null) {
@@ -199,17 +204,50 @@ class LocationTrackingService {
 
   /// Start location updates with adaptive interval
   void _startLocationUpdates() {
-    // Use timer for adaptive interval control
-    _trackingTimer = Timer.periodic(Duration(seconds: _getAdaptiveInterval()), (timer) async {
-      await _updateLocation();
-      
-      // Adjust interval dynamically
-      timer.cancel();
-      _trackingTimer = Timer.periodic(Duration(seconds: _getAdaptiveInterval()), (t) => _updateLocation());
-    });
+    _trackingTimer?.cancel();
+    _positionStream?.cancel();
 
-    // Initial update
-    _updateLocation();
+    // For native Android tracking reliability (especially in background), Geolocator
+    // works best with a Position Stream + Foreground Service notification.
+    // We still keep our adaptive logic, but we throttle *sending* to the backend
+    // based on _getAdaptiveInterval().
+    _positionStream = Geolocator.getPositionStream(locationSettings: _buildLocationSettings())
+        .listen((position) async {
+      await _handlePositionUpdate(position);
+    }, onError: (e) {
+      debugPrint('Position stream error: $e');
+    });
+  }
+
+  LocationSettings _buildLocationSettings() {
+    final accuracy = _batteryLevel < 20 ? LocationAccuracy.medium : LocationAccuracy.high;
+    const distanceFilter = 10;
+    const interval = Duration(seconds: _intervalMovingSeconds);
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return AndroidSettings(
+        accuracy: accuracy,
+        distanceFilter: distanceFilter,
+        intervalDuration: interval,
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'Rastreamento ativo',
+          notificationText: 'Sua localização está sendo enviada para a entrega em andamento',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      );
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return AppleSettings(
+        accuracy: accuracy,
+        distanceFilter: distanceFilter,
+        allowBackgroundLocationUpdates: true,
+        pauseLocationUpdatesAutomatically: false,
+      );
+    }
+
+    return LocationSettings(accuracy: accuracy, distanceFilter: distanceFilter);
   }
 
   /// Get adaptive interval based on movement and battery
@@ -230,24 +268,21 @@ class LocationTrackingService {
     return _intervalMovingSeconds; // Moving
   }
 
-  /// Update location and send to server
-  Future<void> _updateLocation() async {
+  Future<void> _handlePositionUpdate(Position position) async {
     if (!_isTracking) return;
 
     try {
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: LocationSettings(
-          accuracy: _batteryLevel < 20 ? LocationAccuracy.medium : LocationAccuracy.high,
-          distanceFilter: 10, // Minimum 10m movement
-        ),
-      ).timeout(const Duration(seconds: 10));
+      final now = DateTime.now();
+      final minInterval = Duration(seconds: _getAdaptiveInterval());
+      final last = _lastUpdateTime;
+      if (last != null && now.difference(last) < minInterval) return;
 
       final batteryLevel = await _battery.batteryLevel;
       final speed = position.speed * 3.6; // Convert m/s to km/h
       final isMoving = speed >= _stationaryThresholdKmh;
 
       final locationPoint = LocationPoint(
-        id: '', // Will be assigned by server
+        id: '',
         entregaId: _currentEntregaId!,
         motoristaId: _currentMotoristaId!,
         latitude: position.latitude,
@@ -258,36 +293,26 @@ class LocationTrackingService {
         altitude: position.altitude,
         batteryLevel: batteryLevel,
         isMoving: isMoving,
-        createdAt: DateTime.now(),
+        createdAt: now,
       );
 
-      // Try to send to server if online
       if (_isOnline) {
         final success = await _sendLocationToServer(locationPoint);
-        if (!success) {
-          // Queue for later sync if failed
-          await CacheService.addToPendingSync(locationPoint);
-        }
+        if (!success) await CacheService.addToPendingSync(locationPoint);
       } else {
-        // Offline - add to pending sync queue
         await CacheService.addToPendingSync(locationPoint);
-        
-        // Check queue size
         final pending = await CacheService.getPendingSync();
         if (pending.length > _maxPendingLocations) {
           debugPrint('⚠️ Max pending locations reached - oldest will be discarded');
         }
       }
 
-      // Cache locally
       await CacheService.cacheLocation(locationPoint);
-      
       _lastPosition = position;
-      _lastUpdateTime = DateTime.now();
+      _lastUpdateTime = now;
       _batteryLevel = batteryLevel;
-
     } catch (e) {
-      debugPrint('Update location error: $e');
+      debugPrint('Handle position update error: $e');
     }
   }
 

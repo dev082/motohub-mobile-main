@@ -853,6 +853,7 @@ export type Database = {
         Row: {
           assinatura_recebedor: string | null
           carga_id: string
+          carroceria_id: string | null
           codigo: string | null
           coletado_em: string | null
           created_at: string | null
@@ -863,8 +864,11 @@ export type Database = {
           foto_comprovante_coleta: string | null
           foto_comprovante_entrega: string | null
           id: string
+          manifesto_url: string | null
           motorista_id: string | null
           nome_recebedor: string | null
+          notas_fiscais_urls: string[] | null
+          numero_cte: string | null
           observacoes: string | null
           peso_alocado_kg: number | null
           status: Database["public"]["Enums"]["status_entrega"] | null
@@ -876,6 +880,7 @@ export type Database = {
         Insert: {
           assinatura_recebedor?: string | null
           carga_id: string
+          carroceria_id?: string | null
           codigo?: string | null
           coletado_em?: string | null
           created_at?: string | null
@@ -886,8 +891,11 @@ export type Database = {
           foto_comprovante_coleta?: string | null
           foto_comprovante_entrega?: string | null
           id?: string
+          manifesto_url?: string | null
           motorista_id?: string | null
           nome_recebedor?: string | null
+          notas_fiscais_urls?: string[] | null
+          numero_cte?: string | null
           observacoes?: string | null
           peso_alocado_kg?: number | null
           status?: Database["public"]["Enums"]["status_entrega"] | null
@@ -899,6 +907,7 @@ export type Database = {
         Update: {
           assinatura_recebedor?: string | null
           carga_id?: string
+          carroceria_id?: string | null
           codigo?: string | null
           coletado_em?: string | null
           created_at?: string | null
@@ -909,8 +918,11 @@ export type Database = {
           foto_comprovante_coleta?: string | null
           foto_comprovante_entrega?: string | null
           id?: string
+          manifesto_url?: string | null
           motorista_id?: string | null
           nome_recebedor?: string | null
+          notas_fiscais_urls?: string[] | null
+          numero_cte?: string | null
           observacoes?: string | null
           peso_alocado_kg?: number | null
           status?: Database["public"]["Enums"]["status_entrega"] | null
@@ -925,6 +937,13 @@ export type Database = {
             columns: ["carga_id"]
             isOneToOne: false
             referencedRelation: "cargas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entregas_carroceria_id_fkey"
+            columns: ["carroceria_id"]
+            isOneToOne: false
+            referencedRelation: "carrocerias"
             referencedColumns: ["id"]
           },
           {
@@ -1853,6 +1872,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_carga_tx: {
+        Args: {
+          p_carga_id: string
+          p_carroceria_id: string
+          p_motorista_id: string
+          p_peso_kg: number
+          p_veiculo_id: string
+        }
+        Returns: Json
+      }
       create_chat_for_entrega: {
         Args: { p_entrega_id: string }
         Returns: string
@@ -1895,14 +1924,11 @@ export type Database = {
         | "faturado_30"
       status_carga: "publicada" | "parcialmente_alocada" | "totalmente_alocada"
       status_entrega:
-        | "aguardando_coleta"
-        | "em_coleta"
-        | "coletado"
-        | "em_transito"
-        | "em_entrega"
+        | "aguardando"
+        | "saiu_para_coleta"
+        | "saiu_para_entrega"
         | "entregue"
         | "problema"
-        | "devolvida"
         | "cancelada"
       tipo_cadastro_motorista: "autonomo" | "frota"
       tipo_carga:
@@ -2101,14 +2127,11 @@ export const Constants = {
       ],
       status_carga: ["publicada", "parcialmente_alocada", "totalmente_alocada"],
       status_entrega: [
-        "aguardando_coleta",
-        "em_coleta",
-        "coletado",
-        "em_transito",
-        "em_entrega",
+        "aguardando",
+        "saiu_para_coleta",
+        "saiu_para_entrega",
         "entregue",
         "problema",
-        "devolvida",
         "cancelada",
       ],
       tipo_cadastro_motorista: ["autonomo", "frota"],

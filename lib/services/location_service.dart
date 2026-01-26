@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:motohub/models/entrega.dart';
 import 'package:motohub/supabase/supabase_config.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 /// Service for managing location tracking
 class LocationService {
@@ -22,19 +21,22 @@ class LocationService {
         return false;
       }
 
-      // Check permission status
-      var permission = await Permission.location.status;
-      if (permission.isDenied) {
-        permission = await Permission.location.request();
+      // Use Geolocator permission APIs for cross-platform behavior.
+      var permission = await Geolocator.checkPermission();
+      debugPrint('Location permission status: $permission');
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        debugPrint('Location permission after request: $permission');
       }
 
-      if (permission.isPermanentlyDenied) {
+      if (permission == LocationPermission.deniedForever) {
         debugPrint('Location permission permanently denied');
-        await openAppSettings();
+        if (!kIsWeb) await Geolocator.openAppSettings();
         return false;
       }
 
-      return permission.isGranted;
+      return permission == LocationPermission.always || permission == LocationPermission.whileInUse;
     } catch (e) {
       debugPrint('Check permissions error: $e');
       return false;

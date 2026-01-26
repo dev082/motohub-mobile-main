@@ -158,10 +158,13 @@ class EntregaService {
       // Start tracking when collection begins
       if (status == StatusEntrega.saiuParaColeta) {
         debugPrint('🚀 Auto-starting tracking for entrega $entregaId');
-        await LocationTrackingService.instance.startTracking(
+        final ok = await LocationTrackingService.instance.startTracking(
           entregaId,
           entrega.motoristaId!,
         );
+        if (!ok) {
+          debugPrint('⚠️ Tracking not started (missing permissions or other issue) for entrega $entregaId');
+        }
       }
       // Stop tracking when delivery is completed or cancelled
       else if ([

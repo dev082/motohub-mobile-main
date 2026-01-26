@@ -416,7 +416,12 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
       await LocationTrackingService.instance.stopTracking();
     } else {
       if (_entregaAtual != null) {
-        await LocationTrackingService.instance.startTracking(_entregaAtual!.id, motorista.id);
+        final ok = await LocationTrackingService.instance.startTracking(_entregaAtual!.id, motorista.id);
+        if (!ok && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Permita a localização para ativar o rastreador (Configurações / navegador).')),
+          );
+        }
       }
     }
     await _checkTrackingStatus();
