@@ -1,0 +1,404 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:motohub/models/motorista.dart';
+import 'package:motohub/services/auth_service.dart';
+import 'package:motohub/services/location_service.dart';
+import 'package:motohub/services/location_tracking_service.dart';
+import 'package:motohub/services/notification_service.dart';
+import 'package:motohub/services/secure_storage_service.dart';
+import 'package:motohub/supabase/supabase_config.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Main app provider for managing global state
+class AppProvider with ChangeNotifier {
+  final AuthService _authService = AuthService();
+  final LocationService _locationService = LocationService();
+
+  RealtimeChannel? _mensagensChannel;
+  String? _activeEntregaChatId;
+
+  final Map<String, String> _cargaCodigoByChatId = {};
+  final Map<String, String> _entregaIdByChatId = {};
+
+  Motorista? _currentMotorista;
+  String? _activeEntregaId;
+  bool _isLoading = false;
+  bool _isInitialized = false;
+  String? _errorMessage;
+
+  ThemeMode _themeMode = ThemeMode.system;
+
+  AppProvider() {
+    _initializeAuth();
+    _setupAuthListener();
+    _initializeTrackingService();
+    _loadThemeMode();
+  }
+
+  static const String _themeModeStorageKey = 'app_theme_mode';
+
+  ThemeMode get themeMode => _themeMode;
+
+  Future<void> _loadThemeMode() async {
+    try {
+      final value = await SecureStorageService.read(_themeModeStorageKey);
+      final normalized = (value ?? '').trim().toLowerCase();
+      final mode = switch (normalized) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        'system' || '' => ThemeMode.system,
+        _ => ThemeMode.system,
+      };
+      if (mode != _themeMode) {
+        _themeMode = mode;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Load themeMode error: $e');
+    }
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+    notifyListeners();
+    try {
+      await SecureStorageService.write(
+        _themeModeStorageKey,
+        switch (mode) {
+          ThemeMode.light => 'light',
+          ThemeMode.dark => 'dark',
+          ThemeMode.system => 'system',
+        },
+      );
+    } catch (e) {
+      debugPrint('Persist themeMode error: $e');
+    }
+  }
+
+  Future<void> _initializeTrackingService() async {
+    try {
+      await LocationTrackingService.instance.init();
+    } catch (e) {
+      debugPrint('Initialize tracking service error: $e');
+    }
+  }
+
+  /// Verifica se há uma sessão salva ao inicializar o app
+  Future<void> _initializeAuth() async {
+    _setLoading(true);
+    try {
+      // Importante: não devemos “travar” o app esperando JWT/storage.
+      // Se não existir sessão, finalizamos a inicialização e mostramos o login.
+      final session = SupabaseConfig.auth.currentSession;
+      final user = SupabaseConfig.auth.currentUser;
+
+      if (session == null && user == null) {
+        debugPrint('Auth bootstrap: no saved session found. Showing login.');
+        return;
+      }
+
+      // Se existir sessão (login persistido), carregamos o motorista.
+      // Colocamos timeout defensivo para evitar loading infinito.
+      await loadCurrentMotorista().timeout(const Duration(seconds: 8));
+    } catch (e) {
+      debugPrint('Auth initialization error: $e');
+    } finally {
+      _isInitialized = true;
+      _setLoading(false);
+    }
+  }
+
+  /// Configura listener para mudanças de autenticação
+  void _setupAuthListener() {
+    SupabaseConfig.auth.onAuthStateChange.listen((data) async {
+      final session = data.session;
+      if (session == null) {
+        // Sessão expirou ou usuário fez logout
+        _currentMotorista = null;
+        await _stopChatNotifications();
+        notifyListeners();
+      } else if (_currentMotorista == null) {
+        // Nova sessão foi criada (login ou recuperação automática)
+        await loadCurrentMotorista();
+      }
+    });
+  }
+
+  Motorista? get currentMotorista => _currentMotorista;
+  String? get activeEntregaId => _activeEntregaId;
+  bool get isLoading => _isLoading;
+  bool get isInitialized => _isInitialized;
+  String? get errorMessage => _errorMessage;
+  bool get isAuthenticated => _currentMotorista != null;
+  LocationService get locationService => _locationService;
+
+  static String _activeEntregaStorageKey(String motoristaId) => 'active_entrega_id:$motoristaId';
+
+  Future<void> setActiveEntregaId(String? entregaId) async {
+    final motorista = _currentMotorista;
+    _activeEntregaId = entregaId;
+    notifyListeners();
+
+    if (motorista == null) return;
+    final key = _activeEntregaStorageKey(motorista.id);
+    try {
+      if (entregaId == null || entregaId.isEmpty) {
+        await SecureStorageService.delete(key);
+      } else {
+        await SecureStorageService.write(key, entregaId);
+      }
+    } catch (e) {
+      // Não queremos travar a UI se storage falhar.
+      debugPrint('Persist activeEntregaId error: $e');
+    }
+  }
+
+  Future<void> _loadActiveEntregaId() async {
+    final motorista = _currentMotorista;
+    if (motorista == null) {
+      _activeEntregaId = null;
+      return;
+    }
+
+    try {
+      final value = await SecureStorageService.read(_activeEntregaStorageKey(motorista.id));
+      _activeEntregaId = (value == null || value.trim().isEmpty) ? null : value.trim();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Load activeEntregaId error: $e');
+    }
+  }
+
+  /// Sign in motorista
+  Future<bool> signIn(String email, String password) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      final motorista = await _authService.signInMotorista(email, password);
+      if (motorista == null) {
+        _setError('Email ou senha inválidos');
+        return false;
+      }
+
+      _currentMotorista = motorista;
+      notifyListeners();
+
+      // Start realtime notifications after login.
+      await _startChatNotifications();
+      return true;
+    } catch (e) {
+      _setError('Erro ao fazer login: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Sign out
+  Future<void> signOut() async {
+    try {
+      // Stop location tracking if active
+      _locationService.stopTracking();
+      await LocationTrackingService.instance.stopTracking();
+
+      await _stopChatNotifications();
+      
+      await _authService.signOut();
+      _currentMotorista = null;
+      _activeEntregaId = null;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Sign out error: $e');
+    }
+  }
+
+  /// Used by ChatScreen to avoid notifying while the user is already in that chat.
+  void setActiveChatEntregaId(String? entregaId) {
+    _activeEntregaChatId = entregaId;
+  }
+
+  Future<void> _startChatNotifications() async {
+    // Defensive: remove previous channel if any.
+    await _stopChatNotifications();
+
+    final motorista = _currentMotorista;
+    final authUid = SupabaseConfig.client.auth.currentUser?.id;
+    if (motorista == null || authUid == null) return;
+
+    final channel = SupabaseConfig.client.channel('mensagens:notifications');
+    _mensagensChannel = channel;
+
+    channel.onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'mensagens',
+      callback: (payload) async {
+        try {
+          final record = payload.newRecord;
+          final chatId = record['chat_id'] as String?;
+          final senderId = record['sender_id'] as String?;
+          final senderNome = (record['sender_nome'] as String?)?.trim();
+          final conteudo = (record['conteudo'] as String?)?.trim();
+
+          if (chatId == null || senderId == null || conteudo == null || conteudo.isEmpty) return;
+          // Don't notify for my own messages.
+          if (senderId == authUid) return;
+
+          final entregaId = await _resolveEntregaId(chatId);
+          if (entregaId == null) return;
+
+          // If user is currently viewing this chat, skip notification.
+          if (_activeEntregaChatId != null && _activeEntregaChatId == entregaId) return;
+
+          // Confirm this chat belongs to the motorista logged in.
+          final belongs = await _entregaBelongsToMotorista(entregaId, motorista.id);
+          if (!belongs) return;
+
+          final cargaCodigo = await _resolveCargaCodigo(chatId);
+          await NotificationService.instance.showChatMessage(
+            cargaCodigo: cargaCodigo,
+            senderNome: (senderNome == null || senderNome.isEmpty) ? 'Mensagem' : senderNome,
+            message: conteudo,
+          );
+        } catch (e) {
+          debugPrint('Chat notification callback error: $e');
+        }
+      },
+    );
+
+    channel.subscribe((status, error) {
+      debugPrint('Notifications channel status=$status error=$error');
+    });
+  }
+
+  Future<void> _stopChatNotifications() async {
+    try {
+      final ch = _mensagensChannel;
+      if (ch != null) {
+        await SupabaseConfig.client.removeChannel(ch);
+      }
+    } catch (e) {
+      debugPrint('Stop chat notifications error: $e');
+    } finally {
+      _mensagensChannel = null;
+      _cargaCodigoByChatId.clear();
+      _entregaIdByChatId.clear();
+      _activeEntregaChatId = null;
+    }
+  }
+
+  Future<String?> _resolveEntregaId(String chatId) async {
+    final cached = _entregaIdByChatId[chatId];
+    if (cached != null) return cached;
+    try {
+      final data = await SupabaseConfig.client.from('chats').select('entrega_id').eq('id', chatId).maybeSingle();
+      final entregaId = data?['entrega_id'] as String?;
+      if (entregaId != null) _entregaIdByChatId[chatId] = entregaId;
+      return entregaId;
+    } catch (e) {
+      debugPrint('Resolve entregaId error: $e');
+      return null;
+    }
+  }
+
+  Future<String> _resolveCargaCodigo(String chatId) async {
+    final cached = _cargaCodigoByChatId[chatId];
+    if (cached != null) return cached;
+    try {
+      final entregaId = await _resolveEntregaId(chatId);
+      if (entregaId == null) return '—';
+
+      final data = await SupabaseConfig.client
+          .from('entregas')
+          .select('codigo, carga:carga_id(codigo)')
+          .eq('id', entregaId)
+          .maybeSingle();
+
+      final entregaCodigo = (data?['codigo'] as String?)?.trim();
+      final carga = data?['carga'] as Map<String, dynamic>?;
+      final cargaCodigo = (carga?['codigo'] as String?)?.trim();
+
+      final result = (entregaCodigo != null && entregaCodigo.isNotEmpty)
+          ? entregaCodigo
+          : (cargaCodigo != null && cargaCodigo.isNotEmpty)
+              ? cargaCodigo
+              : '—';
+
+      _cargaCodigoByChatId[chatId] = result;
+      return result;
+    } catch (e) {
+      debugPrint('Resolve cargaCodigo error: $e');
+      return '—';
+    }
+  }
+
+  Future<bool> _entregaBelongsToMotorista(String entregaId, String motoristaId) async {
+    try {
+      final data = await SupabaseConfig.client.from('entregas').select('motorista_id').eq('id', entregaId).maybeSingle();
+      return (data?['motorista_id'] as String?) == motoristaId;
+    } catch (e) {
+      debugPrint('Check entrega motorista error: $e');
+      return false;
+    }
+  }
+
+  /// Load current motorista
+  Future<void> loadCurrentMotorista() async {
+    _setLoading(true);
+    try {
+      final motorista = await _authService.getCurrentMotorista();
+      _currentMotorista = motorista;
+      await _loadActiveEntregaId();
+      notifyListeners();
+
+      if (motorista != null) {
+        await _startChatNotifications();
+      }
+    } catch (e) {
+      debugPrint('Load current motorista error: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Update motorista profile
+  Future<bool> updateProfile(Map<String, dynamic> updates) async {
+    if (_currentMotorista == null) return false;
+
+    _setLoading(true);
+    _clearError();
+
+    try {
+      await _authService.updateMotorista(_currentMotorista!.id, updates);
+      
+      // Reload motorista data
+      await loadCurrentMotorista();
+      return true;
+    } catch (e) {
+      _setError('Erro ao atualizar perfil: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  void _setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
+  }
+
+  void _setError(String message) {
+    _errorMessage = message;
+    notifyListeners();
+  }
+
+  void _clearError() {
+    _errorMessage = null;
+  }
+
+  void clearError() {
+    _clearError();
+    notifyListeners();
+  }
+}
