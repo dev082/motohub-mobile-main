@@ -35,6 +35,7 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
   List<Entrega> _entregasAtivas = [];
   List<Entrega> _entregasHistorico = [];
   bool _isLoading = true;
+  bool _isRefreshing = false;
 
   AppProvider? _appProvider;
   int _lastEntregasTick = 0;
@@ -230,16 +231,30 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
   }
 
   Future<void> _loadEntregas() async {
-    setState(() => _isLoading = true);
+    if (_isRefreshing) return;
+    setState(() {
+      _isRefreshing = true;
+      _isLoading = true;
+    });
     try {
       final app = context.read<AppProvider>();
       final motorista = app.currentMotorista;
-      if (motorista == null) return;
+      if (motorista == null) {
+        if (mounted) {
+          setState(() {
+            _entregasAtivas = [];
+            _entregasHistorico = [];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
 
       await _startRealtime(motorista.id);
 
       final todasEntregas = await _entregaService.getMotoristaEntregas(motorista.id);
       
+      if (!mounted) return;
       setState(() {
         _entregasAtivas = todasEntregas.where((e) => [
           StatusEntrega.aguardando,
@@ -263,12 +278,14 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
         await app.setActiveEntregaId(_entregasAtivas.first.id);
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erro ao carregar entregas: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
     }
   }
 
@@ -278,6 +295,19 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
       drawer: AppDrawer(activeRoute: GoRouterState.of(context).matchedLocation),
       appBar: AppBar(
         title: const Text('Minhas Entregas'),
+        actions: [
+          IconButton(
+            tooltip: 'Atualizar entregas',
+            onPressed: _isRefreshing ? null : _loadEntregas,
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

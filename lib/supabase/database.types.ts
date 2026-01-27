@@ -852,6 +852,7 @@ export type Database = {
       entregas: {
         Row: {
           assinatura_recebedor: string | null
+          canhoto_url: string | null
           carga_id: string
           carroceria_id: string | null
           codigo: string | null
@@ -879,6 +880,7 @@ export type Database = {
         }
         Insert: {
           assinatura_recebedor?: string | null
+          canhoto_url?: string | null
           carga_id: string
           carroceria_id?: string | null
           codigo?: string | null
@@ -906,6 +908,7 @@ export type Database = {
         }
         Update: {
           assinatura_recebedor?: string | null
+          canhoto_url?: string | null
           carga_id?: string
           carroceria_id?: string | null
           codigo?: string | null
@@ -1138,6 +1141,10 @@ export type Database = {
       }
       mensagens: {
         Row: {
+          anexo_nome: string | null
+          anexo_tamanho: number | null
+          anexo_tipo: string | null
+          anexo_url: string | null
           chat_id: string
           conteudo: string
           created_at: string
@@ -1148,6 +1155,10 @@ export type Database = {
           sender_tipo: string
         }
         Insert: {
+          anexo_nome?: string | null
+          anexo_tamanho?: number | null
+          anexo_tipo?: string | null
+          anexo_url?: string | null
           chat_id: string
           conteudo: string
           created_at?: string
@@ -1158,6 +1169,10 @@ export type Database = {
           sender_tipo: string
         }
         Update: {
+          anexo_nome?: string | null
+          anexo_tamanho?: number | null
+          anexo_tipo?: string | null
+          anexo_url?: string | null
           chat_id?: string
           conteudo?: string
           created_at?: string

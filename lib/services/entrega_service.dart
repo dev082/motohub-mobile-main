@@ -143,10 +143,25 @@ class EntregaService {
         updates['checklist_veiculo'] = checklistData;
       }
 
-      await SupabaseConfig.client
-          .from('entregas')
-          .update(updates)
-          .eq('id', entregaId);
+      try {
+        await SupabaseConfig.client.from('entregas').update(updates).eq('id', entregaId);
+      } on PostgrestException catch (e) {
+        // If the database schema hasn't been migrated yet, PostgREST can throw:
+        // PGRST204: Could not find the 'checklist_veiculo' column of 'entregas' in the schema cache
+        final isMissingChecklistColumn =
+            (e.code == 'PGRST204') && (e.message.toLowerCase().contains('checklist_veiculo'));
+
+        if (isMissingChecklistColumn) {
+          debugPrint(
+            'EntregaService.updateStatus: column checklist_veiculo not found in entregas. '
+            'Retrying update without checklist_veiculo. You likely need to run the migration that adds this column.',
+          );
+          final retry = Map<String, dynamic>.from(updates)..remove('checklist_veiculo');
+          await SupabaseConfig.client.from('entregas').update(retry).eq('id', entregaId);
+        } else {
+          rethrow;
+        }
+      }
 
       // Insert tracking history
       await _insertTrackingHistory(entregaId, status, additionalData?['observacao']);
