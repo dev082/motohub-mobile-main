@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:motohub/models/entrega.dart';
 import 'package:motohub/models/documento_validacao.dart';
@@ -10,6 +11,7 @@ import 'package:motohub/services/location_tracking_service.dart';
 import 'package:motohub/theme.dart';
 import 'package:motohub/widgets/app_drawer.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Tela "Operação do Dia" - Home focada para o motorista
 class OperacaoDiaScreen extends StatefulWidget {
@@ -208,7 +210,7 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => context.push(AppRoutes.entregaNavegacaoPath(entrega.id)),
+                    onPressed: () => context.push(AppRoutes.entregaMapaPath(entrega.id)),
                     icon: const Icon(Icons.map),
                     label: const Text('Ver Rota'),
                     style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
@@ -225,10 +227,78 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: carga == null ? null : () => _openMapsParaEntrega(entrega),
+                icon: const Icon(Icons.directions),
+                label: const Text('Abrir no Maps'),
+                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+              ),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _openMapsParaEntrega(Entrega entrega) async {
+    final carga = entrega.carga;
+    final origem = carga?.origem;
+    final destino = carga?.destino;
+
+    if (origem == null || destino == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Origem/destino não encontrados para abrir no Maps.')),
+      );
+      return;
+    }
+
+    String formatPoint({required double? lat, required double? lng, required String fallback}) {
+      if (lat != null && lng != null) return '${lat.toStringAsFixed(6)},${lng.toStringAsFixed(6)}';
+      return fallback;
+    }
+
+    // Objetivo: usuário segue rota com 2 pernas:
+    // 1) localização atual -> origem
+    // 2) origem -> destino
+    // No Google Maps isso funciona bem com: waypoints=origem e destination=destino.
+    final origemText = formatPoint(
+      lat: origem.latitude,
+      lng: origem.longitude,
+      fallback: origem.enderecoCompleto,
+    );
+    final destinoText = formatPoint(
+      lat: destino.latitude,
+      lng: destino.longitude,
+      fallback: destino.enderecoCompleto,
+    );
+
+    final uri = Uri.https('www.google.com', '/maps/dir/', {
+      'api': '1',
+      'destination': destinoText,
+      'waypoints': origemText,
+      'travelmode': 'driving',
+    });
+
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok) {
+        debugPrint('OperacaoDiaScreen: launchUrl returned false for $uri');
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Não foi possível abrir o Maps.')),
+        );
+      }
+    } catch (e) {
+      debugPrint('OperacaoDiaScreen: failed to open maps: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erro ao abrir o Maps.')),
+      );
+    }
   }
 
   Widget _buildSemEntregasAtivas() {

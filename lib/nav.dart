@@ -7,7 +7,6 @@ import 'package:motohub/screens/chat_history_screen.dart';
 import 'package:motohub/screens/chat_screen.dart';
 import 'package:motohub/screens/carga_detalhes_screen.dart';
 import 'package:motohub/screens/carroceria_form_screen.dart';
-import 'package:motohub/screens/entrega_navigation_screen.dart';
 import 'package:motohub/screens/entrega_route_map_screen.dart';
 import 'package:motohub/screens/entrega_detalhes_screen.dart';
 import 'package:motohub/screens/login_screen.dart';
@@ -105,14 +104,6 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: AppRoutes.entregaNavegacao,
-        name: 'entregaNavegacao',
-        pageBuilder: (context, state) {
-          final entregaId = state.pathParameters['id']!;
-          return MaterialPage(child: EntregaNavigationScreen(entregaId: entregaId));
-        },
-      ),
-      GoRoute(
         path: AppRoutes.veiculoForm,
         name: 'veiculoForm',
         pageBuilder: (context, state) {
@@ -160,7 +151,6 @@ class AppRoutes {
   static const String cargaDetails = '/carga/:id';
   static const String entregaDetails = '/entrega/:id';
   static const String entregaMapa = '/entrega/:id/mapa';
-  static const String entregaNavegacao = '/entrega/:id/navegacao';
   static const String chatHistory = '/chat/historico';
   static const String chat = '/chat/:entregaId';
   static const String veiculoForm = '/veiculos/veiculo';
@@ -170,7 +160,6 @@ class AppRoutes {
   /// Prefer these over manual string concatenation to avoid `Page Not Found`.
   static String entregaDetailsPath(String entregaId) => '/entrega/$entregaId';
   static String entregaMapaPath(String entregaId) => '/entrega/$entregaId/mapa';
-  static String entregaNavegacaoPath(String entregaId) => '/entrega/$entregaId/navegacao';
   static String chatPath(String entregaId) => '/chat/$entregaId';
   static String cargaDetailsPath(String cargaId) => '/carga/$cargaId';
 }
