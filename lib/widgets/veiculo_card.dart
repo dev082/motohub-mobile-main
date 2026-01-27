@@ -17,6 +17,8 @@ class VeiculoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       child: InkWell(
@@ -33,11 +35,11 @@ class VeiculoCard extends StatelessWidget {
                   height: 180,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(),
+                  errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(context),
                 ),
               )
             else
-              _buildPlaceholderImage(),
+              _buildPlaceholderImage(context),
             Padding(
               padding: AppSpacing.paddingMd,
               child: Column(
@@ -55,14 +57,14 @@ class VeiculoCard extends StatelessWidget {
                         IconButton(
                           onPressed: onDelete,
                           icon: const Icon(Icons.delete_outline),
-                          color: Colors.red,
+                          color: cs.error,
                         ),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${veiculo.tipo.label} • ${veiculo.carroceria.label}',
-                    style: context.textStyles.bodyMedium?.withColor(Colors.grey),
+                    style: context.textStyles.bodyMedium?.withColor(cs.onSurfaceVariant),
                   ),
                   if (veiculo.marca != null || veiculo.modelo != null) ...[
                     const SizedBox(height: 8),
@@ -75,7 +77,7 @@ class VeiculoCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       'Ano: ${veiculo.ano}',
-                      style: context.textStyles.bodySmall?.withColor(Colors.grey),
+                      style: context.textStyles.bodySmall?.withColor(cs.onSurfaceVariant),
                     ),
                   ],
                   const SizedBox(height: 12),
@@ -97,19 +99,19 @@ class VeiculoCard extends StatelessWidget {
                         _buildChip(
                           icon: Icons.gps_fixed,
                           label: 'Rastreador',
-                          color: LightModeColors.lightPrimary,
+                          color: cs.primary,
                         ),
                       if (veiculo.seguroAtivo)
                         _buildChip(
                           icon: Icons.verified_user,
                           label: 'Seguro',
-                          color: Colors.blue,
+                          color: cs.tertiary,
                         ),
                       if (!veiculo.ativo)
                         _buildChip(
                           icon: Icons.cancel,
                           label: 'Inativo',
-                          color: Colors.grey,
+                          color: cs.onSurfaceVariant,
                         ),
                     ],
                   ),
@@ -122,29 +124,26 @@ class VeiculoCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPlaceholderImage() {
+  Widget _buildPlaceholderImage(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       height: 180,
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Color(0xFFE0E0E0),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.md)),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.md)),
       ),
-      child: const Icon(
-        Icons.local_shipping,
-        size: 64,
-        color: Colors.white,
-      ),
+      child: Icon(Icons.local_shipping, size: 64, color: cs.onSurfaceVariant.withValues(alpha: 0.35)),
     );
   }
 
   Widget _buildChip({required IconData icon, required String label, Color? color}) {
     return Chip(
-      avatar: Icon(icon, size: 16, color: color ?? Colors.grey),
+      avatar: Icon(icon, size: 16, color: color),
       label: Text(label),
-      labelStyle: TextStyle(fontSize: 12, color: color ?? Colors.grey),
-      side: BorderSide.none,
-      padding: EdgeInsets.zero,
+      labelStyle: TextStyle(color: color),
+      backgroundColor: color?.withValues(alpha: 0.10),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
       visualDensity: VisualDensity.compact,
     );
   }

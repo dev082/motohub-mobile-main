@@ -84,6 +84,10 @@ class ChatService {
     required String senderNome,
     required TipoParticipante senderTipo,
     required String conteudo,
+    String? anexoUrl,
+    String? anexoNome,
+    String? anexoTipo,
+    int? anexoTamanho,
   }) async {
     try {
       final authUid = SupabaseConfig.client.auth.currentUser?.id;
@@ -96,6 +100,10 @@ class ChatService {
             'sender_nome': senderNome,
             'sender_tipo': senderTipo.value,
             'conteudo': conteudo,
+            'anexo_url': anexoUrl,
+            'anexo_nome': anexoNome,
+            'anexo_tipo': anexoTipo,
+            'anexo_tamanho': anexoTamanho,
             'lida': false,
           })
           .select()

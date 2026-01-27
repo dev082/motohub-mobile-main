@@ -17,13 +17,21 @@ class ChatConversationCard extends StatelessWidget {
     required this.entrega,
     required this.lastMessageFuture,
     required this.onTap,
-    this.leadingIcon = Icons.chat_bubble,
+    this.leadingIcon,
+    this.accentColor,
   });
 
   final Entrega entrega;
   final Future<Mensagem?> lastMessageFuture;
   final VoidCallback onTap;
-  final IconData leadingIcon;
+
+  /// Leading icon shown in the colored tile.
+  /// If null, defaults to `Icons.chat_bubble_outline`.
+  final IconData? leadingIcon;
+
+  /// Accent color used for the left border and status chip.
+  /// If null, defaults to theme primary.
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +41,9 @@ class ChatConversationCard extends StatelessWidget {
         ? '${entrega.carga!.origem?.cidade} → ${entrega.carga!.destino?.cidade}'
         : null;
 
+    final accent = accentColor ?? scheme.primary;
+    final icon = leadingIcon ?? Icons.chat_bubble_outline;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: GestureDetector(
@@ -41,72 +52,83 @@ class ChatConversationCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: scheme.surface,
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.35)),
           ),
-          padding: const EdgeInsets.all(AppSpacing.md),
+          clipBehavior: Clip.antiAlias,
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: scheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                ),
-                child: Icon(leadingIcon, color: scheme.onPrimaryContainer),
-              ),
-              const SizedBox(width: AppSpacing.md),
+              Container(width: 4, height: 92, color: accent),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: context.textStyles.titleMedium?.semiBold,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
-                        const SizedBox(width: AppSpacing.sm),
-                        _StatusPill(status: entrega.status),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    FutureBuilder<Mensagem?>(
-                      future: lastMessageFuture,
-                      builder: (context, snapshot) {
-                        final msg = snapshot.data;
-                        final text = _buildPreviewText(msg);
-                        return Text(
-                          text,
-                          style: context.textStyles.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        );
-                      },
-                    ),
-                    if (route != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        route,
-                        style: context.textStyles.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        child: Icon(icon, color: accent, size: 22),
                       ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    title,
+                                    style: context.textStyles.titleMedium?.semiBold,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                _StatusChip(status: entrega.status, accent: accent),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            FutureBuilder<Mensagem?>(
+                              future: lastMessageFuture,
+                              builder: (context, snapshot) {
+                                final msg = snapshot.data;
+                                final text = _buildPreviewText(msg);
+                                return Text(
+                                  text,
+                                  style: context.textStyles.bodySmall?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                );
+                              },
+                            ),
+                            if (route != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                route.toUpperCase(),
+                                style: context.textStyles.labelSmall?.copyWith(
+                                  color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+                                  letterSpacing: 0.6,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Icon(Icons.chevron_right, color: scheme.outline.withValues(alpha: 0.7)),
                     ],
-                  ],
+                  ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Icon(Icons.chevron_right, color: scheme.outline),
             ],
           ),
         ),
@@ -124,43 +146,55 @@ class ChatConversationCard extends StatelessWidget {
     final who = isMe
         ? 'Você'
         : (m.senderNome.trim().isNotEmpty ? m.senderNome.trim() : m.senderTipo.displayName);
+
+    final legacyFile = m.legacyAttachmentFileName;
+    final hasAttachment = (m.anexoUrl != null && m.anexoUrl!.trim().isNotEmpty) || legacyFile != null;
+    final hasText = m.conteudo.trim().isNotEmpty && !(m.isLegacyAttachmentOnly && legacyFile != null);
+    if (hasAttachment && !hasText) {
+      final name = (m.anexoNome != null && m.anexoNome!.trim().isNotEmpty) ? m.anexoNome!.trim() : (legacyFile ?? 'Anexo');
+      final isImage = (m.anexoTipo ?? '').toLowerCase().startsWith('image/') ||
+          name.toLowerCase().endsWith('.png') ||
+          name.toLowerCase().endsWith('.jpg') ||
+          name.toLowerCase().endsWith('.jpeg') ||
+          name.toLowerCase().endsWith('.webp');
+      return '$who: ${isImage ? '🖼️ Foto' : '📎 $name'}'.trim();
+    }
+    if (hasAttachment && hasText) {
+      return '$who: 📎 ${m.conteudo}'.trim();
+    }
     return '$who: ${m.conteudo}'.trim();
   }
 }
 
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.status});
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.status, required this.accent});
   final StatusEntrega status;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
-    final ({Color bg, Color fg, IconData icon}) style = switch (status) {
-      StatusEntrega.entregue => (bg: scheme.tertiaryContainer, fg: scheme.onTertiaryContainer, icon: Icons.check_circle_outline),
-      StatusEntrega.cancelada => (bg: scheme.errorContainer, fg: scheme.onErrorContainer, icon: Icons.cancel_outlined),
-      StatusEntrega.problema => (bg: scheme.errorContainer, fg: scheme.onErrorContainer, icon: Icons.report_gmailerrorred_outlined),
-      _ => (bg: scheme.secondaryContainer, fg: scheme.onSecondaryContainer, icon: Icons.timelapse),
+    final label = status.displayName.toUpperCase();
+    final Color fg = switch (status) {
+      StatusEntrega.problema || StatusEntrega.cancelada => scheme.error,
+      _ => accent,
     };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: style.bg,
+        color: fg.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(style.icon, size: 14, color: style.fg),
-          const SizedBox(width: 6),
-          Text(
-            status.displayName,
-            style: context.textStyles.labelSmall?.copyWith(color: style.fg),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+      child: Text(
+        label,
+        style: context.textStyles.labelSmall?.copyWith(
+          color: fg,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.4,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

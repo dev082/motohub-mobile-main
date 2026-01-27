@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:motohub/models/motorista.dart';
@@ -6,6 +9,7 @@ import 'package:motohub/services/location_service.dart';
 import 'package:motohub/services/location_tracking_service.dart';
 import 'package:motohub/services/notification_service.dart';
 import 'package:motohub/services/secure_storage_service.dart';
+import 'package:motohub/services/storage_upload_service.dart';
 import 'package:motohub/supabase/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -32,6 +36,10 @@ class AppProvider with ChangeNotifier {
 
   ThemeMode _themeMode = ThemeMode.system;
 
+  String? _chatWallpaperUrl;
+  double _chatWallpaperOpacity = 0.10;
+  String? _chatWallpaperLoadedForUserId;
+
   AppProvider() {
     _initializeAuth();
     _setupAuthListener();
@@ -42,6 +50,8 @@ class AppProvider with ChangeNotifier {
   static const String _themeModeStorageKey = 'app_theme_mode';
 
   ThemeMode get themeMode => _themeMode;
+  String? get chatWallpaperUrl => _chatWallpaperUrl;
+  double get chatWallpaperOpacity => _chatWallpaperOpacity;
 
   Future<void> _loadThemeMode() async {
     try {
@@ -119,14 +129,93 @@ class AppProvider with ChangeNotifier {
       if (session == null) {
         // Sessão expirou ou usuário fez logout
         _currentMotorista = null;
+        _chatWallpaperUrl = null;
+        _chatWallpaperOpacity = 0.10;
+        _chatWallpaperLoadedForUserId = null;
         await _stopChatNotifications();
         await _stopEntregaAssignmentRealtime();
         notifyListeners();
       } else if (_currentMotorista == null) {
         // Nova sessão foi criada (login ou recuperação automática)
         await loadCurrentMotorista();
+        await loadChatWallpaperPrefs();
       }
     });
+  }
+
+  static String _chatWallpaperDataKey(String userId) => 'chat_wallpaper_data_$userId';
+  static String _chatWallpaperOpacityKey(String userId) => 'chat_wallpaper_opacity_$userId';
+
+  Future<void> loadChatWallpaperPrefs() async {
+    try {
+      final userId = SupabaseConfig.auth.currentUser?.id;
+      if (userId == null) return;
+      if (_chatWallpaperLoadedForUserId == userId) return;
+
+      final base64Data = await SecureStorageService.read(_chatWallpaperDataKey(userId));
+      final opacityRaw = await SecureStorageService.read(_chatWallpaperOpacityKey(userId));
+      final parsedOpacity = double.tryParse((opacityRaw ?? '').trim());
+
+      // Store a data URI for local wallpaper
+      _chatWallpaperUrl = (base64Data == null || base64Data.trim().isEmpty) ? null : base64Data.trim();
+      _chatWallpaperOpacity = (parsedOpacity != null)
+          ? parsedOpacity.clamp(0.0, 0.5)
+          : 0.10;
+      _chatWallpaperLoadedForUserId = userId;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Load chat wallpaper prefs error: $e');
+    }
+  }
+
+  Future<void> setChatWallpaperOpacity(double opacity) async {
+    _chatWallpaperOpacity = opacity.clamp(0.0, 0.5);
+    notifyListeners();
+    try {
+      final userId = SupabaseConfig.auth.currentUser?.id;
+      if (userId == null) return;
+      await SecureStorageService.write(
+        _chatWallpaperOpacityKey(userId),
+        _chatWallpaperOpacity.toStringAsFixed(3),
+      );
+    } catch (e) {
+      debugPrint('Persist chat wallpaper opacity error: $e');
+    }
+  }
+
+  Future<void> setChatWallpaperUrl(String? dataUri) async {
+    _chatWallpaperUrl = (dataUri == null || dataUri.trim().isEmpty) ? null : dataUri.trim();
+    notifyListeners();
+    try {
+      final userId = SupabaseConfig.auth.currentUser?.id;
+      if (userId == null) return;
+      if (_chatWallpaperUrl == null) {
+        await SecureStorageService.delete(_chatWallpaperDataKey(userId));
+      } else {
+        await SecureStorageService.write(_chatWallpaperDataKey(userId), _chatWallpaperUrl!);
+      }
+    } catch (e) {
+      debugPrint('Persist chat wallpaper data error: $e');
+    }
+  }
+
+  /// Saves a wallpaper image locally (not on Supabase) and sets it as the chat wallpaper.
+  /// The image is stored as a base64 data URI in secure storage.
+  Future<String?> uploadAndSetChatWallpaper({required Uint8List bytes, required String contentType}) async {
+    try {
+      final userId = SupabaseConfig.auth.currentUser?.id;
+      if (userId == null) return null;
+
+      // Convert to base64 data URI for local storage
+      final base64 = const Base64Encoder().convert(bytes);
+      final dataUri = 'data:$contentType;base64,$base64';
+      
+      await setChatWallpaperUrl(dataUri);
+      return dataUri;
+    } catch (e) {
+      debugPrint('Save chat wallpaper locally error: $e');
+      return null;
+    }
   }
 
   Motorista? get currentMotorista => _currentMotorista;

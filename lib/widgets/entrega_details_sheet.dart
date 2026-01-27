@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:motohub/models/entrega.dart';
+import 'package:motohub/nav.dart';
 import 'package:motohub/services/entrega_service.dart';
 import 'package:motohub/theme.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,6 +16,36 @@ class EntregaDetailsSheet extends StatelessWidget {
   final Entrega entrega;
 
   const EntregaDetailsSheet({super.key, required this.entrega});
+
+  String? _firstNonEmpty(Iterable<String?> values) {
+    for (final v in values) {
+      final t = v?.trim();
+      if (t != null && t.isNotEmpty) return t;
+    }
+    return null;
+  }
+
+  String _remetenteNome() {
+    final carga = entrega.carga;
+    // No schema atual, o “remetente” costuma estar associado ao endereço de origem
+    // (contato_nome) ou, em alguns cenários, pode vir preenchido em campos comerciais.
+    return _firstNonEmpty([
+          carga?.origem?.contatoNome,
+          carga?.comercial?['remetente_nome'] as String?,
+          carga?.comercial?['empresa_nome'] as String?,
+        ]) ??
+        '—';
+  }
+
+  String _destinatarioNome() {
+    final carga = entrega.carga;
+    return _firstNonEmpty([
+          carga?.destinatarioNomeFantasia,
+          carga?.destinatarioRazaoSocial,
+          carga?.destino?.contatoNome,
+        ]) ??
+        '—';
+  }
 
   String _formatDate(DateTime? dt) {
     if (dt == null) return '—';
@@ -95,6 +126,10 @@ class EntregaDetailsSheet extends StatelessWidget {
               child: ListView(
                 shrinkWrap: true,
                 children: [
+                  _SectionTitle(title: 'Partes'),
+                  _InfoRow(label: 'Remetente', value: _remetenteNome(), icon: Icons.outbox_outlined),
+                  _InfoRow(label: 'Destinatário', value: _destinatarioNome(), icon: Icons.inbox_outlined),
+                  const SizedBox(height: AppSpacing.md),
                   _SectionTitle(title: 'Rota'),
                   _InfoRow(
                     label: 'Origem',
@@ -109,6 +144,26 @@ class EntregaDetailsSheet extends StatelessWidget {
                         ? '${entrega.carga!.destino!.cidade} - ${entrega.carga!.destino!.estado}'
                         : 'Não informado',
                     icon: Icons.location_on,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  FilledButton.tonalIcon(
+                    onPressed: () {
+                      final router = GoRouter.of(context);
+                      context.pop();
+                      router.push(AppRoutes.entregaMapaPath(entrega.id));
+                    },
+                    style: ButtonStyle(
+                      splashFactory: NoSplash.splashFactory,
+                      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
+                      shape: WidgetStatePropertyAll(
+                        RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
+                      ),
+                    ),
+                    icon: Icon(Icons.map_outlined, color: Theme.of(context).colorScheme.onSecondaryContainer),
+                    label: Text(
+                      'Ver no mapa',
+                      style: context.textStyles.labelLarge?.copyWith(color: Theme.of(context).colorScheme.onSecondaryContainer),
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   _SectionTitle(title: 'Datas'),

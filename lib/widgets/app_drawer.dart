@@ -19,7 +19,9 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Drawer(
+      backgroundColor: cs.surface,
       child: SafeArea(
         child: Column(
           children: [
@@ -32,9 +34,9 @@ class AppDrawer extends StatelessWidget {
                     height: 40,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
-                      color: theme.colorScheme.primaryContainer,
+                      color: cs.primaryContainer,
                     ),
-                    child: Icon(Icons.local_shipping, color: theme.colorScheme.onPrimaryContainer),
+                    child: Icon(Icons.local_shipping, color: cs.onPrimaryContainer),
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
@@ -42,7 +44,7 @@ class AppDrawer extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Hub Frete', style: theme.textTheme.titleMedium),
-                        Text('Motorista', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                        Text('Motorista', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                       ],
                     ),
                   ),
@@ -81,9 +83,12 @@ class AppDrawer extends StatelessWidget {
                       context.go('${AppRoutes.home}?tab=chat');
                     },
                   ),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
-                    child: Text('Outros', style: TextStyle(fontWeight: FontWeight.w700)),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
+                    child: Text(
+                      'Outros',
+                      style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w800, letterSpacing: 0.6),
+                    ),
                   ),
                   _DrawerItem(
                     icon: Icons.directions_car_outlined,
@@ -122,9 +127,12 @@ class AppDrawer extends StatelessWidget {
                     },
                   ),
 
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
-                    child: Text('Aparência', style: TextStyle(fontWeight: FontWeight.w700)),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
+                    child: Text(
+                      'Aparência',
+                      style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w800, letterSpacing: 0.6),
+                    ),
                   ),
                   const _ThemeModeSelector(),
                 ],
@@ -201,10 +209,11 @@ class _DrawerItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
       child: Material(
-        color: selected ? theme.colorScheme.primaryContainer.withValues(alpha: 0.45) : Colors.transparent,
+        color: selected ? cs.primaryContainer.withValues(alpha: 0.40) : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           onTap: onTap,
@@ -214,14 +223,14 @@ class _DrawerItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
             child: Row(
               children: [
-                Icon(icon, color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant),
+                Icon(icon, color: selected ? cs.primary : cs.onSurfaceVariant),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
                     label,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                      color: selected ? theme.colorScheme.onSurface : theme.colorScheme.onSurface,
+                      color: cs.onSurface,
                     ),
                   ),
                 ),

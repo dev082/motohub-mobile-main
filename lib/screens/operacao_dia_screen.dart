@@ -208,7 +208,7 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => context.push(AppRoutes.entregaMapaPath(entrega.id)),
+                    onPressed: () => context.push(AppRoutes.entregaNavegacaoPath(entrega.id)),
                     icon: const Icon(Icons.map),
                     label: const Text('Ver Rota'),
                     style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),

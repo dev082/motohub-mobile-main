@@ -16,9 +16,30 @@ class StorageUploadService {
   ///
   /// Ajustado para o nome real do seu projeto no Supabase Storage.
   static const String documentsBucket = 'notas-fiscais';
+  /// Bucket para anexos de chat.
+  static const String chatAttachmentsBucket = 'chat-anexos';
   static const String checklistFolder = 'checklist';
 
   const StorageUploadService();
+
+  /// Upload de anexo de chat.
+  ///
+  /// Salva em: chat-anexos/{chatId}/{arquivo}
+  Future<String> uploadChatAttachment({
+    required String chatId,
+    required Uint8List bytes,
+    required String fileName,
+    String contentType = 'application/octet-stream',
+  }) async {
+    final safeName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    final path = '$chatId/${DateTime.now().millisecondsSinceEpoch}_$safeName';
+    return uploadPublic(
+      bucket: chatAttachmentsBucket,
+      path: path,
+      bytes: bytes,
+      contentType: contentType,
+    );
+  }
 
   /// Upload de foto do checklist do veículo.
   ///

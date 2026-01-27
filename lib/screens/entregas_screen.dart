@@ -13,6 +13,7 @@ import 'package:motohub/widgets/app_drawer.dart';
 import 'package:motohub/widgets/canhoto_upload_sheet.dart';
 import 'package:motohub/widgets/checklist_veiculo_sheet.dart';
 import 'package:motohub/widgets/entrega_card.dart';
+import 'package:motohub/widgets/entrega_details_sheet.dart';
 import 'package:motohub/widgets/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -382,8 +383,14 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
         final isSelected = app.activeEntregaId == entrega.id;
         return EntregaCard(
           entrega: entrega,
-          // Tap no card abre o mapa em tela cheia para analisar a rota.
-          onTap: () => context.push(AppRoutes.entregaMapaPath(entrega.id)),
+          // Tap no card abre um bottom sheet com detalhes (incluindo remetente/destinatário).
+          // O botão "Ver no mapa" dentro do sheet leva para a rota em tela cheia.
+          onTap: () => showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            showDragHandle: true,
+            builder: (context) => EntregaDetailsSheet(entrega: entrega),
+          ),
           isSelected: isSelected,
           onSelect: () => app.setActiveEntregaId(entrega.id),
           onAdvanceStage: () => _advanceStage(entrega),

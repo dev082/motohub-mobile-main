@@ -40,6 +40,12 @@ class AppRadius {
   static const double xl = 24.0;
 }
 
+/// Standard component sizing used across the app.
+class AppSizes {
+  static const double minTapTarget = 44;
+  static const double navBarHeight = 72;
+}
+
 // =============================================================================
 // TEXT STYLE EXTENSIONS
 // =============================================================================
@@ -112,6 +118,10 @@ class LightModeColors {
   static const lightOutline = Color(0xFF74777F);
   static const lightShadow = Color(0xFF000000);
   static const lightInversePrimary = Color(0xFFACC7E3);
+
+  // Neutrals for minimal UI
+  static const lightSurface2 = Color(0xFFF2F5F7);
+  static const lightSurface3 = Color(0xFFE9EEF2);
 }
 
 /// Dark mode colors with good contrast
@@ -146,6 +156,10 @@ class DarkModeColors {
   static const darkOutline = Color(0xFF8E9099);
   static const darkShadow = Color(0xFF000000);
   static const darkInversePrimary = Color(0xFF00885B);
+
+  // Neutrals for minimal UI
+  static const darkSurface2 = Color(0xFF202327);
+  static const darkSurface3 = Color(0xFF2A2E33);
 }
 
 /// Status badge colors for delivery tracking
@@ -156,6 +170,23 @@ class StatusColors {
   static const delivered = Color(0xFF00885B); // Hub Frete Green
   static const problem = Color(0xFFEF5350); // Red
   static const cancelled = Color(0xFF9E9E9E); // Gray
+}
+
+/// Chat-specific colors to match the conversation UI design.
+///
+/// Keep these colors centralized to avoid hardcoding in widgets.
+class ChatColors {
+  // Light mode
+  static const lightChatBackground = Color(0xFFCFEFEA);
+  static const lightIncomingBubble = Color(0xFFFFFFFF);
+  static const lightOutgoingBubble = Color(0xFFD7F7B0);
+  static const lightDatePill = Color(0xFFE8F2F0);
+
+  // Dark mode
+  static const darkChatBackground = Color(0xFF0F2A29);
+  static const darkIncomingBubble = Color(0xFF1D2426);
+  static const darkOutgoingBubble = Color(0xFF1E3B2A);
+  static const darkDatePill = Color(0xFF1B2F2E);
 }
 
 /// Font size constants
@@ -207,6 +238,7 @@ ThemeData get lightTheme => ThemeData(
   ),
   brightness: Brightness.light,
   scaffoldBackgroundColor: LightModeColors.lightBackground,
+  splashFactory: NoSplash.splashFactory,
   appBarTheme: const AppBarTheme(
     backgroundColor: Colors.transparent,
     foregroundColor: LightModeColors.lightOnSurface,
@@ -215,12 +247,69 @@ ThemeData get lightTheme => ThemeData(
   ),
   cardTheme: CardThemeData(
     elevation: 0,
+    color: LightModeColors.lightSurface,
+    margin: EdgeInsets.zero,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-      side: BorderSide(
-        color: LightModeColors.lightOutline.withOpacity(0.2),
-        width: 1,
-      ),
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      side: BorderSide(color: LightModeColors.lightOutline.withValues(alpha: 0.14), width: 1),
+    ),
+  ),
+  dividerTheme: DividerThemeData(color: LightModeColors.lightOutline.withValues(alpha: 0.12), thickness: 1, space: 1),
+  listTileTheme: const ListTileThemeData(
+    contentPadding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+    minVerticalPadding: 0,
+  ),
+  navigationBarTheme: NavigationBarThemeData(
+    height: AppSizes.navBarHeight,
+    elevation: 0,
+    backgroundColor: LightModeColors.lightSurface,
+    indicatorColor: LightModeColors.lightPrimaryContainer,
+    labelTextStyle: WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
+  ),
+  chipTheme: ChipThemeData(
+    side: BorderSide.none,
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+    labelStyle: _buildTextTheme(Brightness.light).labelMedium,
+    backgroundColor: LightModeColors.lightSurface3,
+    selectedColor: LightModeColors.lightPrimaryContainer,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: LightModeColors.lightSurface2,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderSide: BorderSide(color: LightModeColors.lightOutline.withValues(alpha: 0.18)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderSide: BorderSide(color: LightModeColors.lightOutline.withValues(alpha: 0.18)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderSide: const BorderSide(color: LightModeColors.lightPrimary, width: 1.2),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderSide: const BorderSide(color: LightModeColors.lightError),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
+  ),
+  filledButtonTheme: FilledButtonThemeData(
+    style: ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(AppSizes.minTapTarget, AppSizes.minTapTarget)),
+      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14)),
+      shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl))),
+      textStyle: WidgetStatePropertyAll(_buildTextTheme(Brightness.light).labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+    ),
+  ),
+  outlinedButtonTheme: OutlinedButtonThemeData(
+    style: ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(AppSizes.minTapTarget, AppSizes.minTapTarget)),
+      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14)),
+      shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl))),
+      side: WidgetStatePropertyAll(BorderSide(color: LightModeColors.lightOutline.withValues(alpha: 0.22))),
+      textStyle: WidgetStatePropertyAll(_buildTextTheme(Brightness.light).labelLarge?.copyWith(fontWeight: FontWeight.w700)),
     ),
   ),
   textTheme: _buildTextTheme(Brightness.light),
@@ -252,6 +341,7 @@ ThemeData get darkTheme => ThemeData(
   ),
   brightness: Brightness.dark,
   scaffoldBackgroundColor: DarkModeColors.darkSurface,
+  splashFactory: NoSplash.splashFactory,
   appBarTheme: const AppBarTheme(
     backgroundColor: Colors.transparent,
     foregroundColor: DarkModeColors.darkOnSurface,
@@ -260,12 +350,69 @@ ThemeData get darkTheme => ThemeData(
   ),
   cardTheme: CardThemeData(
     elevation: 0,
+    color: DarkModeColors.darkSurface2,
+    margin: EdgeInsets.zero,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-      side: BorderSide(
-        color: DarkModeColors.darkOutline.withOpacity(0.2),
-        width: 1,
-      ),
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      side: BorderSide(color: DarkModeColors.darkOutline.withValues(alpha: 0.16), width: 1),
+    ),
+  ),
+  dividerTheme: DividerThemeData(color: DarkModeColors.darkOutline.withValues(alpha: 0.16), thickness: 1, space: 1),
+  listTileTheme: const ListTileThemeData(
+    contentPadding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+    minVerticalPadding: 0,
+  ),
+  navigationBarTheme: NavigationBarThemeData(
+    height: AppSizes.navBarHeight,
+    elevation: 0,
+    backgroundColor: DarkModeColors.darkSurface2,
+    indicatorColor: DarkModeColors.darkPrimaryContainer,
+    labelTextStyle: WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
+  ),
+  chipTheme: ChipThemeData(
+    side: BorderSide.none,
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+    labelStyle: _buildTextTheme(Brightness.dark).labelMedium,
+    backgroundColor: DarkModeColors.darkSurface3,
+    selectedColor: DarkModeColors.darkPrimaryContainer,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: DarkModeColors.darkSurface3,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderSide: BorderSide(color: DarkModeColors.darkOutline.withValues(alpha: 0.22)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderSide: BorderSide(color: DarkModeColors.darkOutline.withValues(alpha: 0.22)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderSide: const BorderSide(color: DarkModeColors.darkPrimary, width: 1.2),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderSide: const BorderSide(color: DarkModeColors.darkError),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
+  ),
+  filledButtonTheme: FilledButtonThemeData(
+    style: ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(AppSizes.minTapTarget, AppSizes.minTapTarget)),
+      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14)),
+      shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl))),
+      textStyle: WidgetStatePropertyAll(_buildTextTheme(Brightness.dark).labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+    ),
+  ),
+  outlinedButtonTheme: OutlinedButtonThemeData(
+    style: ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(AppSizes.minTapTarget, AppSizes.minTapTarget)),
+      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14)),
+      shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl))),
+      side: WidgetStatePropertyAll(BorderSide(color: DarkModeColors.darkOutline.withValues(alpha: 0.26))),
+      textStyle: WidgetStatePropertyAll(_buildTextTheme(Brightness.dark).labelLarge?.copyWith(fontWeight: FontWeight.w700)),
     ),
   ),
   textTheme: _buildTextTheme(Brightness.dark),
