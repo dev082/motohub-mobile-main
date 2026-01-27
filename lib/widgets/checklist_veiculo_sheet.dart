@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:motohub/models/checklist_veiculo.dart';
 import 'package:motohub/services/storage_upload_service.dart';
@@ -61,6 +62,7 @@ class _ChecklistVeiculoSheetState extends State<ChecklistVeiculoSheet> {
       });
     } catch (e) {
       setState(() => _isUploading = false);
+      debugPrint('Erro ao adicionar foto no checklist: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erro ao adicionar foto: $e')),
@@ -105,110 +107,146 @@ class _ChecklistVeiculoSheetState extends State<ChecklistVeiculoSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.95,
+        child: Material(
+          color: theme.colorScheme.surface,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.checklist, color: theme.primaryColor),
-                const SizedBox(width: 8),
-                Text('Checklist do Veículo', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(Icons.checklist, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Checklist do Veículo',
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Verifique as condições do veículo antes de iniciar',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.only(bottom: 16 + bottomInset),
+                    children: [
+                      const SizedBox(height: 4),
+                      _buildCheckItem(
+                        label: 'Pneus em bom estado',
+                        value: _pneusOk,
+                        onChanged: (v) => setState(() => _pneusOk = v),
+                      ),
+                      _buildCheckItem(
+                        label: 'Freios funcionando',
+                        value: _freiosOk,
+                        onChanged: (v) => setState(() => _freiosOk = v),
+                      ),
+                      _buildCheckItem(
+                        label: 'Luzes funcionando',
+                        value: _lucesOk,
+                        onChanged: (v) => setState(() => _lucesOk = v),
+                      ),
+                      _buildCheckItem(
+                        label: 'Documentos do veículo',
+                        value: _documentosOk,
+                        onChanged: (v) => setState(() => _documentosOk = v),
+                      ),
+                      _buildCheckItem(
+                        label: 'Veículo limpo e organizado',
+                        value: _limpezaOk,
+                        onChanged: (v) => setState(() => _limpezaOk = v),
+                      ),
+                      const Divider(height: 32),
+                      Text(
+                        'Fotos do Veículo *',
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_fotosUrls.isNotEmpty)
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _fotosUrls
+                              .asMap()
+                              .entries
+                              .map(
+                                (entry) => Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.network(entry.value, height: 86, width: 86, fit: BoxFit.cover),
+                                    ),
+                                    Positioned(
+                                      top: 6,
+                                      right: 6,
+                                      child: InkWell(
+                                        onTap: () => _removerFoto(entry.key),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: theme.colorScheme.error,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(Icons.close, size: 16, color: theme.colorScheme.onError),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: _isUploading ? null : _adicionarFoto,
+                        icon: _isUploading
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.add_a_photo),
+                        label: Text(_isUploading ? 'Enviando...' : 'Adicionar Foto'),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _observacoesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Observações (opcional)',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+                AnimatedPadding(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  padding: EdgeInsets.only(top: 8, bottom: 24 + bottomInset),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _todosOk && _fotosUrls.isNotEmpty ? _confirmar : null,
+                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      child: const Text('Confirmar e Iniciar'),
+                    ),
+                  ),
+                )
               ],
             ),
-            const SizedBox(height: 8),
-            Text('Verifique as condições do veículo antes de iniciar', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey)),
-            const SizedBox(height: 20),
-            _buildCheckItem(
-              label: 'Pneus em bom estado',
-              value: _pneusOk,
-              onChanged: (v) => setState(() => _pneusOk = v),
-            ),
-            _buildCheckItem(
-              label: 'Freios funcionando',
-              value: _freiosOk,
-              onChanged: (v) => setState(() => _freiosOk = v),
-            ),
-            _buildCheckItem(
-              label: 'Luzes funcionando',
-              value: _lucesOk,
-              onChanged: (v) => setState(() => _lucesOk = v),
-            ),
-            _buildCheckItem(
-              label: 'Documentos do veículo',
-              value: _documentosOk,
-              onChanged: (v) => setState(() => _documentosOk = v),
-            ),
-            _buildCheckItem(
-              label: 'Veículo limpo e organizado',
-              value: _limpezaOk,
-              onChanged: (v) => setState(() => _limpezaOk = v),
-            ),
-            const Divider(height: 32),
-            Text('Fotos do Veículo *', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            if (_fotosUrls.isNotEmpty)
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _fotosUrls
-                    .asMap()
-                    .entries
-                    .map((entry) => Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(entry.value, height: 80, width: 80, fit: BoxFit.cover),
-                            ),
-                            Positioned(
-                              top: 4,
-                              right: 4,
-                              child: InkWell(
-                                onTap: () => _removerFoto(entry.key),
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                                  child: const Icon(Icons.close, size: 16, color: Colors.white),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ))
-                    .toList(),
-              ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _isUploading ? null : _adicionarFoto,
-              icon: _isUploading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.add_a_photo),
-              label: Text(_isUploading ? 'Enviando...' : 'Adicionar Foto'),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _observacoesController,
-              decoration: const InputDecoration(
-                labelText: 'Observações (opcional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _todosOk && _fotosUrls.isNotEmpty ? _confirmar : null,
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                child: const Text('Confirmar e Iniciar'),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

@@ -182,8 +182,7 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
     setState(() => _updatingEntregaIds.add(entrega.id));
     try {
       final needsChecklist =
-          (next == StatusEntrega.saiuParaColeta || next == StatusEntrega.saiuParaEntrega) &&
-              (entrega.checklistVeiculo == null);
+          (next == StatusEntrega.saiuParaColeta) && (entrega.checklistVeiculo == null);
 
       if (needsChecklist) {
         final checklist = await showModalBottomSheet<ChecklistVeiculo>(
@@ -191,7 +190,7 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
           isScrollControlled: true,
           showDragHandle: true,
           builder: (context) => ChecklistVeiculoSheet(
-            onSubmit: (c) => Navigator.of(context).pop(c),
+            onSubmit: (c) => context.pop(c),
           ),
         );
         if (checklist == null) return;

@@ -374,8 +374,7 @@ class _EntregaDetalhesScreenState extends State<EntregaDetalhesScreen> with Sing
     // Ao iniciar a operação (coleta/entrega), exigir checklist do veículo.
     // Se já existe checklist salvo na entrega, não pedir novamente.
     final shouldRequireChecklist =
-        (novoStatus == StatusEntrega.saiuParaColeta || novoStatus == StatusEntrega.saiuParaEntrega) &&
-            (_entrega?.checklistVeiculo == null);
+        (novoStatus == StatusEntrega.saiuParaColeta) && (_entrega?.checklistVeiculo == null);
 
     if (shouldRequireChecklist) {
       final checklist = await showModalBottomSheet(
@@ -383,7 +382,7 @@ class _EntregaDetalhesScreenState extends State<EntregaDetalhesScreen> with Sing
         isScrollControlled: true,
         showDragHandle: true,
         builder: (context) => ChecklistVeiculoSheet(
-          onSubmit: (c) => Navigator.of(context).pop(c),
+          onSubmit: (c) => context.pop(c),
         ),
       );
       if (checklist == null) return;
