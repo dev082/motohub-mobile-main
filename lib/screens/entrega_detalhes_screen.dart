@@ -8,6 +8,7 @@ import 'package:motohub/services/entrega_evento_service.dart';
 import 'package:motohub/services/prova_entrega_service.dart';
 import 'package:motohub/widgets/attachment_pickers.dart';
 import 'package:motohub/widgets/canhoto_upload_sheet.dart';
+import 'package:motohub/widgets/checklist_veiculo_sheet.dart';
 import 'package:motohub/widgets/entrega_timeline_widget.dart';
 
 /// Tela de detalhes da entrega com timeline, POD e ações
@@ -135,6 +136,53 @@ class _EntregaDetalhesScreenState extends State<EntregaDetalhesScreen> with Sing
                     _buildInfoRow('Peso Total', '${carga.pesoKg.toStringAsFixed(0)} kg'),
                     if (carga.origem != null) _buildInfoRow('Origem', '${carga.origem!.cidade} - ${carga.origem!.estado}'),
                     if (carga.destino != null) _buildInfoRow('Destino', '${carga.destino!.cidade} - ${carga.destino!.estado}'),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (_entrega!.checklistVeiculo != null) ...[
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.checklist, color: Theme.of(context).primaryColor),
+                        const SizedBox(width: 8),
+                        Text('Checklist do Veículo', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    _buildChecklistItem('Pneus', _entrega!.checklistVeiculo!.pneusOk),
+                    _buildChecklistItem('Freios', _entrega!.checklistVeiculo!.freiosOk),
+                    _buildChecklistItem('Luzes', _entrega!.checklistVeiculo!.lucesOk),
+                    _buildChecklistItem('Documentos', _entrega!.checklistVeiculo!.documentosOk),
+                    _buildChecklistItem('Limpeza', _entrega!.checklistVeiculo!.limpezaOk),
+                    if (_entrega!.checklistVeiculo!.fotosVeiculoUrls.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text('Fotos do Veículo', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _entrega!.checklistVeiculo!.fotosVeiculoUrls
+                            .map((url) => ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(url, height: 80, width: 80, fit: BoxFit.cover),
+                                ))
+                            .toList(),
+                      ),
+                    ],
+                    if (_entrega!.checklistVeiculo!.observacoes != null) ...[
+                      const SizedBox(height: 12),
+                      Text('Observações:', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text(_entrega!.checklistVeiculo!.observacoes!, style: Theme.of(context).textTheme.bodySmall),
+                    ],
                   ],
                 ),
               ),
@@ -323,6 +371,38 @@ class _EntregaDetalhesScreenState extends State<EntregaDetalhesScreen> with Sing
   }
 
   Future<void> _mudarStatus(StatusEntrega novoStatus) async {
+    // Se for iniciar coleta, exigir checklist
+    if (novoStatus == StatusEntrega.saiuParaColeta) {
+      final checklist = await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (context) => ChecklistVeiculoSheet(
+          onSubmit: (c) => Navigator.of(context).pop(c),
+        ),
+      );
+      if (checklist == null) return;
+
+      try {
+        await _entregaService.updateStatus(
+          widget.entregaId,
+          novoStatus,
+          checklistData: checklist.toJson(),
+        );
+        await _eventoService.createEventoFromStatus(widget.entregaId, novoStatus.value);
+        await _loadDados();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status atualizado para ${novoStatus.displayName}')));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao atualizar status')));
+        }
+      }
+      return;
+    }
+
+    // Para outros status, atualizar direto
     try {
       await _entregaService.updateStatus(widget.entregaId, novoStatus);
       await _eventoService.createEventoFromStatus(widget.entregaId, novoStatus.value);

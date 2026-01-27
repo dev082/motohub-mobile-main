@@ -8,6 +8,7 @@ import 'package:motohub/nav.dart';
 import 'package:motohub/theme.dart';
 import 'package:motohub/widgets/app_drawer.dart';
 import 'package:motohub/widgets/carga_card.dart';
+import 'package:motohub/widgets/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -154,22 +155,32 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _filteredCargas.isEmpty
-                    ? _buildEmptyState()
-                    : RefreshIndicator(
-                        onRefresh: _loadCargas,
-                        child: ListView.builder(
-                          padding: AppSpacing.paddingMd,
-                          itemCount: _filteredCargas.length,
-                          itemBuilder: (context, index) {
-                            final carga = _filteredCargas[index];
-                            return CargaCard(
-                              carga: carga,
-                              onTap: () => context.push(AppRoutes.cargaDetailsPath(carga.id)),
-                            );
-                          },
-                        ),
-                      ),
+                : PullToRefresh(
+                    onRefresh: _loadCargas,
+                    child: _filteredCargas.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: AppSpacing.paddingMd,
+                            children: [
+                              SizedBox(
+                                height: MediaQuery.sizeOf(context).height * 0.55,
+                                child: _buildEmptyState(),
+                              ),
+                            ],
+                          )
+                        : ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: AppSpacing.paddingMd,
+                            itemCount: _filteredCargas.length,
+                            itemBuilder: (context, index) {
+                              final carga = _filteredCargas[index];
+                              return CargaCard(
+                                carga: carga,
+                                onTap: () => context.push(AppRoutes.cargaDetailsPath(carga.id)),
+                              );
+                            },
+                          ),
+                  ),
           ),
         ],
       ),

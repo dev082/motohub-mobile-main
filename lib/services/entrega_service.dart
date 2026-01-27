@@ -109,8 +109,8 @@ class EntregaService {
     }
   }
 
-  /// Update entrega status
-  Future<void> updateStatus(String entregaId, StatusEntrega status, {Map<String, dynamic>? additionalData}) async {
+  /// Update entrega status with optional checklist
+  Future<void> updateStatus(String entregaId, StatusEntrega status, {Map<String, dynamic>? additionalData, Map<String, dynamic>? checklistData}) async {
     try {
       final updates = <String, dynamic>{
         'status': status.value,
@@ -128,6 +128,10 @@ class EntregaService {
 
       if (additionalData != null) {
         updates.addAll(additionalData);
+      }
+
+      if (checklistData != null) {
+        updates['checklist_veiculo'] = checklistData;
       }
 
       await SupabaseConfig.client
@@ -243,7 +247,7 @@ class EntregaService {
       final storagePath = 'comprovantes/$fileName';
 
       await SupabaseConfig.client.storage
-          .from('comprovantes')
+          .from('documentos')
           .uploadBinary(
             storagePath,
             Uint8List.fromList(fileBytes),
@@ -251,7 +255,7 @@ class EntregaService {
           );
 
       final publicUrl = SupabaseConfig.client.storage
-          .from('comprovantes')
+          .from('documentos')
           .getPublicUrl(storagePath);
 
       // Update entrega with photo URL

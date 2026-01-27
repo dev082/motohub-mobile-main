@@ -11,6 +11,7 @@ import 'package:motohub/theme.dart';
 import 'package:motohub/widgets/app_drawer.dart';
 import 'package:motohub/widgets/veiculo_card.dart';
 import 'package:motohub/widgets/carroceria_card.dart';
+import 'package:motohub/widgets/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
 
 /// Screen for managing vehicles and trailers
@@ -207,7 +208,7 @@ class _VeiculosScreenState extends State<VeiculosScreen> {
                     ),
                   ),
                 Expanded(
-                  child: RefreshIndicator(
+                  child: PullToRefresh(
                     onRefresh: _loadData,
                     child: _showVeiculos ? _buildVeiculosList(isFrota) : _buildCarroceriasList(isFrota),
                   ),
@@ -226,23 +227,33 @@ class _VeiculosScreenState extends State<VeiculosScreen> {
 
   Widget _buildVeiculosList(bool isFrota) {
     if (_veiculos.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.local_shipping_outlined, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text('Nenhum veículo cadastrado', style: context.textStyles.titleMedium),
-            if (!isFrota) ...[
-              const SizedBox(height: 8),
-              Text('Toque no botão abaixo para adicionar', style: context.textStyles.bodySmall),
-            ],
-          ],
-        ),
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: AppSpacing.paddingMd,
+        children: [
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.55,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.local_shipping_outlined, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text('Nenhum veículo cadastrado', style: context.textStyles.titleMedium, textAlign: TextAlign.center),
+                  if (!isFrota) ...[
+                    const SizedBox(height: 8),
+                    Text('Toque no botão abaixo para adicionar', style: context.textStyles.bodySmall, textAlign: TextAlign.center),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       );
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: AppSpacing.paddingMd,
       itemCount: _veiculos.length,
       itemBuilder: (context, index) {
@@ -258,23 +269,33 @@ class _VeiculosScreenState extends State<VeiculosScreen> {
 
   Widget _buildCarroceriasList(bool isFrota) {
     if (_carrocerias.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.view_carousel_outlined, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text('Nenhuma carroceria cadastrada', style: context.textStyles.titleMedium),
-            if (!isFrota) ...[
-              const SizedBox(height: 8),
-              Text('Toque no botão abaixo para adicionar', style: context.textStyles.bodySmall),
-            ],
-          ],
-        ),
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: AppSpacing.paddingMd,
+        children: [
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.55,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.view_carousel_outlined, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text('Nenhuma carroceria cadastrada', style: context.textStyles.titleMedium, textAlign: TextAlign.center),
+                  if (!isFrota) ...[
+                    const SizedBox(height: 8),
+                    Text('Toque no botão abaixo para adicionar', style: context.textStyles.bodySmall, textAlign: TextAlign.center),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       );
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: AppSpacing.paddingMd,
       itemCount: _carrocerias.length,
       itemBuilder: (context, index) {

@@ -13,6 +13,7 @@ import 'package:motohub/services/veiculo_service.dart';
 import 'package:motohub/nav.dart';
 import 'package:motohub/theme.dart';
 import 'package:motohub/widgets/entrega_route_preview.dart';
+import 'package:motohub/widgets/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
 
 /// Tela de detalhes da Carga.
@@ -54,6 +55,11 @@ class _CargaDetalhesScreenState extends State<CargaDetalhesScreen> {
   }
 
   void _retry() => setState(() => _future = _load());
+
+  Future<void> _refresh() async {
+    setState(() => _future = _load());
+    await _future;
+  }
 
   Future<Carga?> _load() async {
     try {
@@ -243,36 +249,40 @@ class _CargaDetalhesScreenState extends State<CargaDetalhesScreen> {
             );
           }
 
-          return ListView(
-            padding: AppSpacing.paddingMd,
-            children: [
-              _Header(carga: carga),
-              const SizedBox(height: AppSpacing.md),
+          return PullToRefresh(
+            onRefresh: _refresh,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: AppSpacing.paddingMd,
+              children: [
+                _Header(carga: carga),
+                const SizedBox(height: AppSpacing.md),
 
-              // Preview de rota
-              EntregaRoutePreview(origem: carga.origem, destino: carga.destino, height: 200),
-              const SizedBox(height: AppSpacing.md),
+                // Preview de rota
+                EntregaRoutePreview(origem: carga.origem, destino: carga.destino, height: 200),
+                const SizedBox(height: AppSpacing.md),
 
-              _InfoCard(carga: carga),
-              const SizedBox(height: AppSpacing.md),
-              _EnderecoCard(title: 'Origem', icon: Icons.circle, color: cs.primary, endereco: carga.origem),
-              const SizedBox(height: AppSpacing.md),
-              _EnderecoCard(title: 'Destino', icon: Icons.location_on, color: cs.error, endereco: carga.destino),
-              const SizedBox(height: AppSpacing.lg),
+                _InfoCard(carga: carga),
+                const SizedBox(height: AppSpacing.md),
+                _EnderecoCard(title: 'Origem', icon: Icons.circle, color: cs.primary, endereco: carga.origem),
+                const SizedBox(height: AppSpacing.md),
+                _EnderecoCard(title: 'Destino', icon: Icons.location_on, color: cs.error, endereco: carga.destino),
+                const SizedBox(height: AppSpacing.lg),
 
-              _AceiteCard(
-                carga: carga,
-                veiculos: _veiculos,
-                carrocerias: _carrocerias,
-                selectedVeiculoId: _selectedVeiculoId,
-                selectedCarroceriaId: _selectedCarroceriaId,
-                pesoController: _pesoController,
-                accepting: _accepting,
-                onVeiculoChanged: (id) => setState(() => _selectedVeiculoId = id),
-                onCarroceriaChanged: (id) => setState(() => _selectedCarroceriaId = id),
-                onAccept: () => _onAccept(carga),
-              ),
-            ],
+                _AceiteCard(
+                  carga: carga,
+                  veiculos: _veiculos,
+                  carrocerias: _carrocerias,
+                  selectedVeiculoId: _selectedVeiculoId,
+                  selectedCarroceriaId: _selectedCarroceriaId,
+                  pesoController: _pesoController,
+                  accepting: _accepting,
+                  onVeiculoChanged: (id) => setState(() => _selectedVeiculoId = id),
+                  onCarroceriaChanged: (id) => setState(() => _selectedCarroceriaId = id),
+                  onAccept: () => _onAccept(carga),
+                ),
+              ],
+            ),
           );
         },
       ),

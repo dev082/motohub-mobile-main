@@ -8,6 +8,7 @@ import 'package:motohub/services/entrega_service.dart';
 import 'package:motohub/theme.dart';
 import 'package:motohub/widgets/app_drawer.dart';
 import 'package:motohub/widgets/chat_conversation_card.dart';
+import 'package:motohub/widgets/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
 
 /// Chat list screen - shows chats for active deliveries
@@ -86,19 +87,29 @@ class _ChatListScreenState extends State<ChatListScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _entregasComChat.isEmpty
-              ? _buildEmptyState()
-              : RefreshIndicator(
-                  onRefresh: _loadChats,
-                  child: ListView.builder(
-                    padding: AppSpacing.paddingMd,
-                    itemCount: _entregasComChat.length,
-                    itemBuilder: (context, index) {
-                      final entrega = _entregasComChat[index];
-                      return _buildChatItem(context, entrega);
-                    },
-                  ),
-                ),
+          : PullToRefresh(
+              onRefresh: _loadChats,
+              child: _entregasComChat.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: AppSpacing.paddingMd,
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.sizeOf(context).height * 0.55,
+                          child: _buildEmptyState(),
+                        ),
+                      ],
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: AppSpacing.paddingMd,
+                      itemCount: _entregasComChat.length,
+                      itemBuilder: (context, index) {
+                        final entrega = _entregasComChat[index];
+                        return _buildChatItem(context, entrega);
+                      },
+                    ),
+            ),
     );
   }
 

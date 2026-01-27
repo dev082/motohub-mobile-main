@@ -1,4 +1,5 @@
 import 'package:motohub/models/carga.dart';
+import 'package:motohub/models/checklist_veiculo.dart';
 
 /// Entrega model representing delivery assignments from Supabase
 class Entrega {
@@ -20,6 +21,7 @@ class Entrega {
   final double? valorFrete;
   final String? codigo;
   final String? cteUrl;
+  final ChecklistVeiculo? checklistVeiculo;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -45,6 +47,7 @@ class Entrega {
     this.valorFrete,
     this.codigo,
     this.cteUrl,
+    this.checklistVeiculo,
     required this.createdAt,
     required this.updatedAt,
     this.carga,
@@ -70,6 +73,7 @@ class Entrega {
       valorFrete: json['valor_frete'] != null ? (json['valor_frete'] as num).toDouble() : null,
       codigo: json['codigo'] as String?,
       cteUrl: json['cte_url'] as String?,
+      checklistVeiculo: json['checklist_veiculo'] != null ? ChecklistVeiculo.fromJson(json['checklist_veiculo'] as Map<String, dynamic>) : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       carga: json['carga'] != null ? Carga.fromJson(json['carga'] as Map<String, dynamic>) : null,
@@ -95,6 +99,7 @@ class Entrega {
         'valor_frete': valorFrete,
         'codigo': codigo,
         'cte_url': cteUrl,
+        'checklist_veiculo': checklistVeiculo?.toJson(),
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
       };

@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:motohub/models/location_point.dart';
 import 'package:motohub/models/tracking_session.dart';
 import 'package:motohub/services/cache_service.dart';
@@ -12,6 +14,10 @@ import 'package:motohub/supabase/supabase_config.dart';
 class LocationTrackingService {
   static final LocationTrackingService instance = LocationTrackingService._();
   LocationTrackingService._();
+
+  /// Notifies listeners whenever tracking is started/stopped.
+  /// Useful for keeping UI (GPS icon) in sync even when tracking starts automatically.
+  final ValueNotifier<bool> isTrackingNotifier = ValueNotifier<bool>(false);
 
   final Battery _battery = Battery();
   final Connectivity _connectivity = Connectivity();
@@ -28,6 +34,7 @@ class LocationTrackingService {
   bool _isTracking = false;
   bool _isOnline = true;
   int _batteryLevel = 100;
+  String? _lastError;
   
   // Adaptive interval settings
   static const int _intervalMovingSeconds = 5; // 5s when moving
@@ -38,6 +45,12 @@ class LocationTrackingService {
 
   bool get isTracking => _isTracking;
   String? get currentSessionId => _currentSessionId;
+  String? get lastError => _lastError;
+
+  void _setIsTracking(bool value) {
+    _isTracking = value;
+    if (isTrackingNotifier.value != value) isTrackingNotifier.value = value;
+  }
 
   /// Initialize tracking service
   Future<void> init() async {
@@ -84,9 +97,12 @@ class LocationTrackingService {
   /// Check and request permissions
   Future<bool> checkPermissions() async {
     try {
+      _lastError = null;
+
       // Check location services
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
+        _lastError = 'Serviço de localização desativado no aparelho.';
         debugPrint('Location services disabled');
         return false;
       }
@@ -101,6 +117,7 @@ class LocationTrackingService {
       }
 
       if (permission == LocationPermission.deniedForever) {
+        _lastError = 'Permissão de localização bloqueada permanentemente.';
         debugPrint('Location permission permanently denied');
         if (!kIsWeb) {
           // On web there is no app settings page to open.
@@ -109,16 +126,33 @@ class LocationTrackingService {
         return false;
       }
 
-      // Best-effort attempt to upgrade to "always" on mobile if needed.
-      // (This depends on platform configuration and user choice.)
-      if (!kIsWeb && permission == LocationPermission.whileInUse) {
-        final upgraded = await Geolocator.requestPermission();
-        debugPrint('Location permission upgrade attempt: $upgraded');
-        permission = upgraded;
+      final ok = permission == LocationPermission.always || permission == LocationPermission.whileInUse;
+      if (!ok) {
+        _lastError = 'Permissão de localização negada.';
+        return false;
       }
 
-      return permission == LocationPermission.always || permission == LocationPermission.whileInUse;
+      // Android 13+: Foreground tracking via Geolocator uses a notification.
+      // If notifications are blocked, the foreground service may fail to start.
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        final notif = await Permission.notification.status;
+        if (!notif.isGranted) {
+          final req = await Permission.notification.request();
+          debugPrint('Notification permission: $req');
+        }
+
+        // Request background location when available (best effort).
+        // Some OEMs require it for continuous tracking when app is not in foreground.
+        final bg = await Permission.locationAlways.status;
+        if (!bg.isGranted) {
+          final req = await Permission.locationAlways.request();
+          debugPrint('Background location permission: $req');
+        }
+      }
+
+      return true;
     } catch (e) {
+      _lastError = 'Erro ao checar permissões de localização.';
       debugPrint('Check permissions error: $e');
       return false;
     }
@@ -132,9 +166,10 @@ class LocationTrackingService {
     }
 
     try {
+      debugPrint('➡️ startTracking(entregaId=$entregaId, motoristaId=$motoristaId)');
       final hasPermission = await checkPermissions();
       if (!hasPermission) {
-        debugPrint('No location permission - cannot start tracking');
+        debugPrint('No location permission - cannot start tracking. lastError=$_lastError');
         return false;
       }
 
@@ -147,6 +182,7 @@ class LocationTrackingService {
       _currentSessionId = await _createTrackingSession(entregaId, motoristaId);
       
       if (_currentSessionId == null) {
+        _lastError = 'Não foi possível criar a sessão de rastreamento no servidor.';
         debugPrint('Failed to create tracking session');
         return false;
       }
@@ -155,8 +191,8 @@ class LocationTrackingService {
       await _saveTrackingState();
 
       // Start location updates with adaptive interval
-      _isTracking = true;
-      _startLocationUpdates();
+      _setIsTracking(true);
+      await _primeAndStartLocationUpdates();
 
       debugPrint('✅ Tracking started for entrega $entregaId');
       await _sendNotification(
@@ -167,8 +203,9 @@ class LocationTrackingService {
 
       return true;
     } catch (e) {
+      _lastError = 'Erro ao iniciar rastreamento: $e';
       debugPrint('Start tracking error: $e');
-      _isTracking = false;
+      _setIsTracking(false);
       return false;
     }
   }
@@ -178,6 +215,7 @@ class LocationTrackingService {
     if (!_isTracking) return;
 
     try {
+      debugPrint('➡️ stopTracking(session=$_currentSessionId)');
       _trackingTimer?.cancel();
       await _positionStream?.cancel();
       
@@ -189,7 +227,7 @@ class LocationTrackingService {
       // Clear state
       await _clearTrackingState();
       
-      _isTracking = false;
+      _setIsTracking(false);
       _currentEntregaId = null;
       _currentMotoristaId = null;
       _currentSessionId = null;
@@ -203,9 +241,23 @@ class LocationTrackingService {
   }
 
   /// Start location updates with adaptive interval
-  void _startLocationUpdates() {
+  Future<void> _primeAndStartLocationUpdates() async {
     _trackingTimer?.cancel();
     _positionStream?.cancel();
+
+    // Important: if the driver is stationary, the stream may not emit immediately
+    // due to distanceFilter. Prime with a current position so the UI/server
+    // sees the first point instantly.
+    try {
+      final current = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      debugPrint('📍 Prime position: ${current.latitude}, ${current.longitude}');
+      await _handlePositionUpdate(current);
+    } catch (e) {
+      debugPrint('Prime current position error: $e');
+      // Non-fatal: still start the stream.
+    }
 
     // For native Android tracking reliability (especially in background), Geolocator
     // works best with a Position Stream + Foreground Service notification.
@@ -215,13 +267,14 @@ class LocationTrackingService {
         .listen((position) async {
       await _handlePositionUpdate(position);
     }, onError: (e) {
+      _lastError = 'Falha no stream de localização.';
       debugPrint('Position stream error: $e');
     });
   }
 
   LocationSettings _buildLocationSettings() {
     final accuracy = _batteryLevel < 20 ? LocationAccuracy.medium : LocationAccuracy.high;
-    const distanceFilter = 10;
+    const distanceFilter = 5;
     const interval = Duration(seconds: _intervalMovingSeconds);
 
     if (defaultTargetPlatform == TargetPlatform.android) {
@@ -372,6 +425,12 @@ class LocationTrackingService {
 
       return response['id'] as String;
     } catch (e) {
+      // Surface the root cause to the UI to make debugging RLS/schema issues easier.
+      if (e is PostgrestException) {
+        _lastError = 'Falha ao criar sessão: ${e.message}';
+      } else {
+        _lastError = 'Falha ao criar sessão: $e';
+      }
       debugPrint('Create tracking session error: $e');
       return null;
     }
@@ -415,8 +474,8 @@ class LocationTrackingService {
         _currentEntregaId = entregaId;
         _currentMotoristaId = motoristaId;
         _currentSessionId = sessionId;
-        _isTracking = true;
-        _startLocationUpdates();
+        _setIsTracking(true);
+        await _primeAndStartLocationUpdates();
       }
     } catch (e) {
       debugPrint('Restore tracking state error: $e');

@@ -11,6 +11,7 @@ import 'package:motohub/widgets/attachment_pickers.dart';
 import 'package:motohub/widgets/app_drawer.dart';
 import 'package:motohub/widgets/canhoto_upload_sheet.dart';
 import 'package:motohub/widgets/entrega_card.dart';
+import 'package:motohub/widgets/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -243,7 +244,7 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+          : PullToRefresh(
               onRefresh: _loadEntregas,
               child: TabBarView(
                 controller: _tabController,
@@ -267,28 +268,39 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
     required String isEmpty,
   }) {
     if (entregas.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.local_shipping_outlined,
-              size: 80,
-              color: Theme.of(context).colorScheme.outline,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              isEmpty,
-              style: context.textStyles.titleMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: AppSpacing.paddingMd,
+        children: [
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.55,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.local_shipping_outlined,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    isEmpty,
+                    style: context.textStyles.titleMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: AppSpacing.paddingMd,
       itemCount: entregas.length,
       itemBuilder: (context, index) {

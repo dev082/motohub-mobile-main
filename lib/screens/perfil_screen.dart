@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:motohub/providers/app_provider.dart';
 import 'package:motohub/theme.dart';
 import 'package:motohub/widgets/app_drawer.dart';
+import 'package:motohub/widgets/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
 
 /// Profile screen - shows motorista information
@@ -39,9 +40,11 @@ class PerfilScreen extends StatelessWidget {
             IconButton(onPressed: context.pop, icon: const Icon(Icons.close), tooltip: 'Fechar'),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: AppSpacing.paddingLg,
-        child: Column(
+      body: PullToRefresh(
+        onRefresh: () => context.read<AppProvider>().loadCurrentMotorista(),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: AppSpacing.paddingLg,
           children: [
             // Profile picture
             Center(

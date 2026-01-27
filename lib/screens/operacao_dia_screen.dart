@@ -28,12 +28,27 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
   List<DocumentoValidacao> _documentosAlerta = [];
   bool _isLoading = true;
   bool _isTrackingAtivo = false;
+  VoidCallback? _trackingListener;
 
   @override
   void initState() {
     super.initState();
     _loadDados();
-    _checkTrackingStatus();
+    _isTrackingAtivo = LocationTrackingService.instance.isTracking;
+    _trackingListener = () {
+      if (!mounted) return;
+      setState(() => _isTrackingAtivo = LocationTrackingService.instance.isTrackingNotifier.value);
+    };
+    LocationTrackingService.instance.isTrackingNotifier.addListener(_trackingListener!);
+  }
+
+  @override
+  void dispose() {
+    final l = _trackingListener;
+    if (l != null) {
+      LocationTrackingService.instance.isTrackingNotifier.removeListener(l);
+    }
+    super.dispose();
   }
 
   Future<void> _loadDados() async {
@@ -60,10 +75,8 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
     }
   }
 
-  Future<void> _checkTrackingStatus() async {
-    final isActive = LocationTrackingService.instance.isTracking;
-    setState(() => _isTrackingAtivo = isActive);
-  }
+  Future<void> _checkTrackingStatus() async =>
+      setState(() => _isTrackingAtivo = LocationTrackingService.instance.isTracking);
 
   @override
   Widget build(BuildContext context) {
@@ -415,13 +428,24 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
     if (_isTrackingAtivo) {
       await LocationTrackingService.instance.stopTracking();
     } else {
-      if (_entregaAtual != null) {
-        final ok = await LocationTrackingService.instance.startTracking(_entregaAtual!.id, motorista.id);
-        if (!ok && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Permita a localização para ativar o rastreador (Configurações / navegador).')),
-          );
-        }
+      if (_entregaAtual == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sem entrega ativa para iniciar o rastreamento.')),
+        );
+        return;
+      }
+
+      final ok = await LocationTrackingService.instance.startTracking(_entregaAtual!.id, motorista.id);
+      if (!ok && mounted) {
+        final reason = LocationTrackingService.instance.lastError;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              reason ?? 'Não foi possível iniciar o rastreador. Verifique as permissões de localização.',
+            ),
+          ),
+        );
       }
     }
     await _checkTrackingStatus();
