@@ -39,6 +39,21 @@ class _CanhotoUploadSheetState extends State<CanhotoUploadSheet> {
     }
   }
 
+  Future<void> _takePhoto() async {
+    try {
+      final picked = await pickCameraPhotoFile();
+      if (!mounted) return;
+      if (picked == null) return;
+      setState(() {
+        _file = picked;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Não foi possível abrir a câmera.');
+    }
+  }
+
   Future<void> _submit() async {
     if (_file == null) {
       setState(() => _error = 'Anexe o canhoto para finalizar.');
@@ -107,6 +122,9 @@ class _CanhotoUploadSheetState extends State<CanhotoUploadSheet> {
                 required: true,
                 file: _file,
                 onPick: _pick,
+                secondaryLabel: 'Tirar foto',
+                secondaryIcon: Icons.photo_camera_outlined,
+                onSecondaryPick: _takePhoto,
                 onClear: () => setState(() => _file = null),
               ),
             ),

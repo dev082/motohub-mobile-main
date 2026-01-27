@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:motohub/models/checklist_veiculo.dart';
 import 'package:motohub/services/storage_upload_service.dart';
+import 'package:motohub/providers/app_provider.dart';
+import 'package:provider/provider.dart';
 
 /// Bottom sheet para preencher checklist do veículo antes de iniciar entrega
 class ChecklistVeiculoSheet extends StatefulWidget {
@@ -34,6 +36,11 @@ class _ChecklistVeiculoSheetState extends State<ChecklistVeiculoSheet> {
   Future<void> _adicionarFoto() async {
     setState(() => _isUploading = true);
     try {
+      final motoristaId = context.read<AppProvider>().currentMotorista?.id;
+      if (motoristaId == null || motoristaId.isEmpty) {
+        throw Exception('Motorista não autenticado');
+      }
+
       final picker = ImagePicker();
       final file = await picker.pickImage(source: ImageSource.camera);
       if (file == null) {
@@ -42,10 +49,8 @@ class _ChecklistVeiculoSheetState extends State<ChecklistVeiculoSheet> {
       }
 
       final bytes = await file.readAsBytes();
-      final fileName = 'checklist_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final url = await StorageUploadService().uploadPublic(
-        bucket: 'veiculos',
-        path: fileName,
+      final url = await const StorageUploadService().uploadChecklistPhoto(
+        motoristaId: motoristaId,
         bytes: bytes,
         contentType: 'image/jpeg',
       );

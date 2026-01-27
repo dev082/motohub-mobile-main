@@ -3,11 +3,20 @@ import 'package:flutter/foundation.dart';
 import 'package:motohub/models/entrega.dart';
 import 'package:motohub/services/location_tracking_service.dart';
 import 'package:motohub/services/notification_service.dart';
+import 'package:motohub/services/storage_upload_service.dart';
 import 'package:motohub/supabase/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for managing entregas (deliveries)
 class EntregaService {
+  static const List<String> _documentsBucketFallback = [
+    StorageUploadService.documentsBucket,
+    'notas-fiscais',
+    'documents',
+    'comprovantes',
+    'documentos',
+  ];
+
   /// Aceitar uma carga automaticamente.
   ///
   /// Fluxo:
@@ -244,28 +253,31 @@ class EntregaService {
     try {
       final ext = _safeFileExtension(originalFileName);
       final fileName = '${entregaId}_${isColeta ? 'coleta' : 'entrega'}_${DateTime.now().millisecondsSinceEpoch}${ext.isEmpty ? '' : '.$ext'}';
-      final storagePath = 'comprovantes/$fileName';
+      // No Supabase, "pastas" são apenas prefixos no path.
+      // Vamos padronizar canhotos em: notas-fiscais/canhotos/<arquivo>
+      final storagePath = 'canhotos/$fileName';
 
-      await SupabaseConfig.client.storage
-          .from('documentos')
-          .uploadBinary(
-            storagePath,
-            Uint8List.fromList(fileBytes),
-            fileOptions: FileOptions(contentType: contentType, upsert: true),
-          );
+      final publicUrl = await _uploadWithBucketFallback(
+        path: storagePath,
+        bytes: Uint8List.fromList(fileBytes),
+        contentType: contentType,
+      );
 
-      final publicUrl = SupabaseConfig.client.storage
-          .from('documentos')
-          .getPublicUrl(storagePath);
-
-      // Update entrega with photo URL
+      // Update entrega with photo URL and canhoto_url
       final field = isColeta ? 'foto_comprovante_coleta' : 'foto_comprovante_entrega';
+      final updates = {
+        field: publicUrl,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      
+      // Se for comprovante de entrega (não coleta), salvar também em canhoto_url
+      if (!isColeta) {
+        updates['canhoto_url'] = publicUrl;
+      }
+      
       await SupabaseConfig.client
           .from('entregas')
-          .update({
-            field: publicUrl,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
+          .update(updates)
           .eq('id', entregaId);
 
       return publicUrl;
@@ -273,6 +285,42 @@ class EntregaService {
       debugPrint('Upload comprovante error: $e');
       rethrow;
     }
+  }
+
+  Future<String> _uploadWithBucketFallback({
+    required String path,
+    required Uint8List bytes,
+    String? contentType,
+  }) async {
+    StorageException? lastStorage;
+    for (final bucket in _documentsBucketFallback.toSet()) {
+      try {
+        return await const StorageUploadService().uploadPublic(
+          bucket: bucket,
+          path: path,
+          bytes: bytes,
+          contentType: contentType,
+        );
+      } on StorageException catch (e) {
+        lastStorage = e;
+        if (e.statusCode == 404) {
+          debugPrint('Storage bucket "$bucket" not found (404). Trying next candidate...');
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    debugPrint(
+      'Nenhum bucket de Storage encontrado para comprovantes. '
+      'Crie/renomeie o bucket (ex: "notas-fiscais") no Supabase Storage ou ajuste o nome no app.',
+    );
+    final msg = lastStorage?.message ?? 'Bucket not found';
+    throw StorageException(
+      msg,
+      statusCode: (lastStorage?.statusCode ?? 404).toString(),
+      error: (lastStorage?.error ?? msg).toString(),
+    );
   }
 
   String _safeFileExtension(String fileName) {

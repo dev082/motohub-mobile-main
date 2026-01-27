@@ -12,9 +12,31 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class StorageUploadService {
   static const String vehicleBucket = 'veiculos';
   static const String trailerBucket = 'carrocerias';
-  static const String documentsBucket = 'documentos';
+  /// Bucket padrão para documentos (CTe, canhotos, etc).
+  ///
+  /// Ajustado para o nome real do seu projeto no Supabase Storage.
+  static const String documentsBucket = 'notas-fiscais';
+  static const String checklistFolder = 'checklist';
 
   const StorageUploadService();
+
+  /// Upload de foto do checklist do veículo.
+  ///
+  /// Salva em: notas-fiscais/checklist/{motoristaId}/{arquivo}
+  Future<String> uploadChecklistPhoto({
+    required String motoristaId,
+    required Uint8List bytes,
+    String contentType = 'image/jpeg',
+  }) async {
+    final fileName = 'checklist_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final path = '$checklistFolder/$motoristaId/$fileName';
+    return uploadPublic(
+      bucket: documentsBucket,
+      path: path,
+      bytes: bytes,
+      contentType: contentType,
+    );
+  }
 
   Future<String> uploadPublic({
     required String bucket,

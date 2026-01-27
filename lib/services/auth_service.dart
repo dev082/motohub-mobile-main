@@ -64,10 +64,81 @@ class AuthService {
           .maybeSingle();
 
       if (motoristaData == null) return null;
-      return Motorista.fromJson(motoristaData);
+
+      final motorista = Motorista.fromJson(motoristaData);
+
+      // Importante: os recursos críticos (ex.: tracking_sessions/locations) usam RLS
+      // baseado em auth.uid(). Se o login legado não criar uma sessão Supabase Auth,
+      // as inserções falham no app nativo.
+      await _ensureAuthSessionForMotorista(
+        email: email,
+        password: password,
+        motoristaId: motorista.id,
+        existingUserId: motorista.userId,
+      );
+
+      // Recarrega motorista para refletir o user_id atualizado (se aplicável)
+      final refreshed = await SupabaseConfig.client
+          .from('motoristas')
+          .select()
+          .eq('id', motorista.id)
+          .maybeSingle();
+
+      return refreshed != null ? Motorista.fromJson(refreshed) : motorista;
     } catch (e) {
       debugPrint('Custom sign in error: $e');
       return null;
+    }
+  }
+
+  Future<void> _ensureAuthSessionForMotorista({
+    required String email,
+    required String password,
+    required String motoristaId,
+    required String? existingUserId,
+  }) async {
+    try {
+      final current = SupabaseConfig.auth.currentUser;
+      if (current != null) {
+        // Se já existe sessão e o motorista ainda não está linkado, linka.
+        if (existingUserId == null || existingUserId.isEmpty) {
+          await SupabaseConfig.client.from('motoristas').update({
+            'user_id': current.id,
+            'updated_at': DateTime.now().toIso8601String(),
+          }).eq('id', motoristaId);
+        }
+        return;
+      }
+
+      // Tenta logar pelo Auth. Se não existir usuário, tenta criar.
+      try {
+        final authResponse = await SupabaseConfig.auth.signInWithPassword(email: email, password: password);
+        final user = authResponse.user;
+        if (user != null && (existingUserId == null || existingUserId.isEmpty || existingUserId != user.id)) {
+          await SupabaseConfig.client.from('motoristas').update({
+            'user_id': user.id,
+            'updated_at': DateTime.now().toIso8601String(),
+          }).eq('id', motoristaId);
+        }
+        return;
+      } on AuthException catch (e) {
+        // "Invalid login credentials" geralmente indica que o usuário ainda não foi criado no Auth.
+        debugPrint('Auth signInWithPassword failed (will try signUp): ${e.message}');
+      }
+
+      final signUp = await SupabaseConfig.auth.signUp(email: email, password: password);
+      final user = signUp.user;
+      if (user != null) {
+        await SupabaseConfig.client.from('motoristas').update({
+          'user_id': user.id,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', motoristaId);
+      } else {
+        debugPrint('Auth signUp returned null user for motoristaId=$motoristaId');
+      }
+    } catch (e) {
+      // Não quebra o login se o vínculo falhar, mas registra para diagnóstico.
+      debugPrint('EnsureAuthSessionForMotorista error: $e');
     }
   }
 

@@ -167,6 +167,15 @@ class LocationTrackingService {
 
     try {
       debugPrint('➡️ startTracking(entregaId=$entregaId, motoristaId=$motoristaId)');
+
+      // Tracking usa tabelas com RLS baseado em auth.uid(). Sem sessão Auth,
+      // a inserção de tracking_sessions/locations falhará.
+      if (SupabaseConfig.auth.currentUser == null) {
+        _lastError = 'Você precisa estar autenticado para iniciar o rastreamento.';
+        debugPrint('No Supabase Auth session - cannot start tracking');
+        return false;
+      }
+
       final hasPermission = await checkPermissions();
       if (!hasPermission) {
         debugPrint('No location permission - cannot start tracking. lastError=$_lastError');
@@ -182,7 +191,8 @@ class LocationTrackingService {
       _currentSessionId = await _createTrackingSession(entregaId, motoristaId);
       
       if (_currentSessionId == null) {
-        _lastError = 'Não foi possível criar a sessão de rastreamento no servidor.';
+        // _createTrackingSession já preenche _lastError com a causa (ex.: RLS/schema).
+        _lastError ??= 'Não foi possível criar a sessão de rastreamento no servidor.';
         debugPrint('Failed to create tracking session');
         return false;
       }

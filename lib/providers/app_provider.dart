@@ -15,7 +15,11 @@ class AppProvider with ChangeNotifier {
   final LocationService _locationService = LocationService();
 
   RealtimeChannel? _mensagensChannel;
+  RealtimeChannel? _entregasAssignmentsChannel;
   String? _activeEntregaChatId;
+
+  int _entregasRealtimeTick = 0;
+  final Set<String> _notifiedEntregaAssignments = {};
 
   final Map<String, String> _cargaCodigoByChatId = {};
   final Map<String, String> _entregaIdByChatId = {};
@@ -116,6 +120,7 @@ class AppProvider with ChangeNotifier {
         // Sessão expirou ou usuário fez logout
         _currentMotorista = null;
         await _stopChatNotifications();
+        await _stopEntregaAssignmentRealtime();
         notifyListeners();
       } else if (_currentMotorista == null) {
         // Nova sessão foi criada (login ou recuperação automática)
@@ -126,6 +131,7 @@ class AppProvider with ChangeNotifier {
 
   Motorista? get currentMotorista => _currentMotorista;
   String? get activeEntregaId => _activeEntregaId;
+  int get entregasRealtimeTick => _entregasRealtimeTick;
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
   String? get errorMessage => _errorMessage;
@@ -186,6 +192,7 @@ class AppProvider with ChangeNotifier {
 
       // Start realtime notifications after login.
       await _startChatNotifications();
+      await _startEntregaAssignmentRealtime();
       return true;
     } catch (e) {
       _setError('Erro ao fazer login: $e');
@@ -203,6 +210,7 @@ class AppProvider with ChangeNotifier {
       await LocationTrackingService.instance.stopTracking();
 
       await _stopChatNotifications();
+      await _stopEntregaAssignmentRealtime();
       
       await _authService.signOut();
       _currentMotorista = null;
@@ -270,6 +278,97 @@ class AppProvider with ChangeNotifier {
     channel.subscribe((status, error) {
       debugPrint('Notifications channel status=$status error=$error');
     });
+  }
+
+  Future<void> _startEntregaAssignmentRealtime() async {
+    await _stopEntregaAssignmentRealtime();
+
+    final motorista = _currentMotorista;
+    if (motorista == null) return;
+
+    final channel = SupabaseConfig.client.channel('entregas:assignments:${motorista.id}');
+    _entregasAssignmentsChannel = channel;
+
+    Future<void> handleRecord(Map<String, dynamic> record, {Map<String, dynamic>? oldRecord}) async {
+      try {
+        final entregaId = record['id'] as String?;
+        final newMotoristaId = record['motorista_id'] as String?;
+        final oldMotoristaId = oldRecord?['motorista_id'] as String?;
+
+        if (entregaId == null) return;
+        if (newMotoristaId != motorista.id) return;
+
+        // Avoid duplicate notifications for the same entrega.
+        if (_notifiedEntregaAssignments.contains(entregaId)) {
+          // Still bump tick so UI can refresh if needed.
+          _entregasRealtimeTick++;
+          notifyListeners();
+          return;
+        }
+
+        // If this is an UPDATE, only notify when the assignment just happened.
+        if (oldRecord != null && oldMotoristaId == motorista.id) {
+          // Already assigned before, skip notification.
+          return;
+        }
+
+        _notifiedEntregaAssignments.add(entregaId);
+        _entregasRealtimeTick++;
+        notifyListeners();
+
+        // Auto-select as active entrega if none selected.
+        if ((_activeEntregaId == null || _activeEntregaId!.isEmpty)) {
+          await setActiveEntregaId(entregaId);
+        }
+
+        await NotificationService.instance.showDeliveryEvent(
+          title: '📦 Nova entrega designada',
+          message: 'Uma entrega foi atribuída para você agora.',
+          tipo: 'entrega_designada',
+          entregaId: entregaId,
+          motoristaId: motorista.id,
+        );
+      } catch (e) {
+        debugPrint('Entrega assignment realtime callback error: $e');
+      }
+    }
+
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'entregas',
+          callback: (payload) async {
+            final record = Map<String, dynamic>.from(payload.newRecord);
+            await handleRecord(record);
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'entregas',
+          callback: (payload) async {
+            final record = Map<String, dynamic>.from(payload.newRecord);
+            final old = payload.oldRecord.isEmpty ? null : Map<String, dynamic>.from(payload.oldRecord);
+            await handleRecord(record, oldRecord: old);
+          },
+        );
+
+    channel.subscribe((status, error) {
+      debugPrint('Entrega assignments channel status=$status error=$error');
+    });
+  }
+
+  Future<void> _stopEntregaAssignmentRealtime() async {
+    try {
+      final ch = _entregasAssignmentsChannel;
+      if (ch != null) await SupabaseConfig.client.removeChannel(ch);
+    } catch (e) {
+      debugPrint('Stop entrega assignment realtime error: $e');
+    } finally {
+      _entregasAssignmentsChannel = null;
+      _notifiedEntregaAssignments.clear();
+    }
   }
 
   Future<void> _stopChatNotifications() async {
@@ -354,6 +453,7 @@ class AppProvider with ChangeNotifier {
 
       if (motorista != null) {
         await _startChatNotifications();
+        await _startEntregaAssignmentRealtime();
       }
     } catch (e) {
       debugPrint('Load current motorista error: $e');

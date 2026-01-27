@@ -21,6 +21,7 @@ class Entrega {
   final double? valorFrete;
   final String? codigo;
   final String? cteUrl;
+  final String? canhotoUrl;
   final ChecklistVeiculo? checklistVeiculo;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -47,6 +48,7 @@ class Entrega {
     this.valorFrete,
     this.codigo,
     this.cteUrl,
+    this.canhotoUrl,
     this.checklistVeiculo,
     required this.createdAt,
     required this.updatedAt,
@@ -73,6 +75,7 @@ class Entrega {
       valorFrete: json['valor_frete'] != null ? (json['valor_frete'] as num).toDouble() : null,
       codigo: json['codigo'] as String?,
       cteUrl: json['cte_url'] as String?,
+      canhotoUrl: json['canhoto_url'] as String?,
       checklistVeiculo: json['checklist_veiculo'] != null ? ChecklistVeiculo.fromJson(json['checklist_veiculo'] as Map<String, dynamic>) : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
@@ -99,6 +102,7 @@ class Entrega {
         'valor_frete': valorFrete,
         'codigo': codigo,
         'cte_url': cteUrl,
+        'canhoto_url': canhotoUrl,
         'checklist_veiculo': checklistVeiculo?.toJson(),
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
@@ -123,6 +127,7 @@ class Entrega {
     double? valorFrete,
     String? codigo,
     String? cteUrl,
+    String? canhotoUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
     Carga? carga,
@@ -146,6 +151,7 @@ class Entrega {
       valorFrete: valorFrete ?? this.valorFrete,
       codigo: codigo ?? this.codigo,
       cteUrl: cteUrl ?? this.cteUrl,
+      canhotoUrl: canhotoUrl ?? this.canhotoUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       carga: carga ?? this.carga,

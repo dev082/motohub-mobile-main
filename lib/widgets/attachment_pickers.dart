@@ -160,6 +160,10 @@ class DocumentPickerTile extends StatelessWidget {
   final PickedBinaryFile? file;
   final bool required;
   final VoidCallback onPick;
+  /// Optional secondary action, e.g. "Tirar foto".
+  final String? secondaryLabel;
+  final IconData? secondaryIcon;
+  final VoidCallback? onSecondaryPick;
   final VoidCallback? onClear;
 
   const DocumentPickerTile({
@@ -169,6 +173,9 @@ class DocumentPickerTile extends StatelessWidget {
     required this.file,
     this.required = false,
     required this.onPick,
+    this.secondaryLabel,
+    this.secondaryIcon,
+    this.onSecondaryPick,
     this.onClear,
   });
 
@@ -252,10 +259,24 @@ class DocumentPickerTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          OutlinedButton.icon(
-            onPressed: onPick,
-            icon: const Icon(Icons.upload_file, size: 18),
-            label: Text(file == null ? 'Anexar' : 'Trocar'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.end,
+            children: [
+              if (onSecondaryPick != null && secondaryLabel != null) ...[
+                OutlinedButton.icon(
+                  onPressed: onSecondaryPick,
+                  icon: Icon(secondaryIcon ?? Icons.photo_camera_outlined, size: 18),
+                  label: Text(secondaryLabel!),
+                ),
+              ],
+              OutlinedButton.icon(
+                onPressed: onPick,
+                icon: const Icon(Icons.upload_file, size: 18),
+                label: Text(file == null ? 'Anexar' : 'Trocar'),
+              ),
+            ],
           ),
         ],
       ),
@@ -324,6 +345,26 @@ Future<PickedBinaryFile?> pickDocumentFile() async {
     name: file.name,
     bytes: bytes,
     contentType: _guessContentType(file.name),
+  );
+}
+
+/// Helper method for taking a photo using the device camera.
+///
+/// On web, this will fallback to the browser camera/file prompt.
+Future<PickedBinaryFile?> pickCameraPhotoFile() async {
+  final picker = ImagePicker();
+  final xfile = await picker.pickImage(
+    source: ImageSource.camera,
+    imageQuality: 82,
+    maxWidth: 2048,
+  );
+  if (xfile == null) return null;
+  final bytes = await xfile.readAsBytes();
+  final name = (xfile.name.trim().isEmpty) ? 'camera_${DateTime.now().millisecondsSinceEpoch}.jpg' : xfile.name;
+  return PickedBinaryFile(
+    name: name,
+    bytes: bytes,
+    contentType: _guessContentType(name) ?? 'image/jpeg',
   );
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:motohub/nav.dart';
+import 'package:motohub/models/checklist_veiculo.dart';
 import 'package:motohub/models/entrega.dart';
 import 'package:motohub/providers/app_provider.dart';
 import 'package:motohub/services/entrega_service.dart';
@@ -10,6 +11,7 @@ import 'package:motohub/theme.dart';
 import 'package:motohub/widgets/attachment_pickers.dart';
 import 'package:motohub/widgets/app_drawer.dart';
 import 'package:motohub/widgets/canhoto_upload_sheet.dart';
+import 'package:motohub/widgets/checklist_veiculo_sheet.dart';
 import 'package:motohub/widgets/entrega_card.dart';
 import 'package:motohub/widgets/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
@@ -34,6 +36,9 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
   List<Entrega> _entregasHistorico = [];
   bool _isLoading = true;
 
+  AppProvider? _appProvider;
+  int _lastEntregasTick = 0;
+
   @override
   void initState() {
     super.initState();
@@ -42,7 +47,31 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final app = context.read<AppProvider>();
+    if (!identical(_appProvider, app)) {
+      _appProvider?.removeListener(_onAppProviderChanged);
+      _appProvider = app;
+      _lastEntregasTick = app.entregasRealtimeTick;
+      app.addListener(_onAppProviderChanged);
+    }
+  }
+
+  void _onAppProviderChanged() {
+    final app = _appProvider;
+    if (app == null) return;
+    if (app.entregasRealtimeTick != _lastEntregasTick) {
+      _lastEntregasTick = app.entregasRealtimeTick;
+      // If the user is on this screen, refresh to ensure joins (carga/origem/destino)
+      // are up-to-date for newly assigned entregas.
+      _loadEntregas();
+    }
+  }
+
+  @override
   void dispose() {
+    _appProvider?.removeListener(_onAppProviderChanged);
     _stopRealtime();
     _tabController.dispose();
     super.dispose();
@@ -151,7 +180,22 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
 
     setState(() => _updatingEntregaIds.add(entrega.id));
     try {
-      if (next == StatusEntrega.entregue) {
+      final needsChecklist =
+          (next == StatusEntrega.saiuParaColeta || next == StatusEntrega.saiuParaEntrega) &&
+              (entrega.checklistVeiculo == null);
+
+      if (needsChecklist) {
+        final checklist = await showModalBottomSheet<ChecklistVeiculo>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (context) => ChecklistVeiculoSheet(
+            onSubmit: (c) => Navigator.of(context).pop(c),
+          ),
+        );
+        if (checklist == null) return;
+        await _entregaService.updateStatus(entrega.id, next, checklistData: checklist.toJson());
+      } else if (next == StatusEntrega.entregue) {
         final ok = await showModalBottomSheet<bool>(
           context: context,
           isScrollControlled: true,
