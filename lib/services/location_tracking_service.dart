@@ -35,6 +35,10 @@ class LocationTrackingService {
   bool _isOnline = true;
   int _batteryLevel = 100;
   String? _lastError;
+
+  // Server uses "tracking_historico" for location history and "localizações" for current position.
+  bool _serverTrackingEnabled = true;
+  String? _motoristaEmail;
   
   // Adaptive interval settings
   static const int _intervalMovingSeconds = 5; // 5s when moving
@@ -46,6 +50,8 @@ class LocationTrackingService {
   bool get isTracking => _isTracking;
   String? get currentSessionId => _currentSessionId;
   String? get lastError => _lastError;
+
+  bool get isServerTrackingEnabled => _serverTrackingEnabled;
 
   void _setIsTracking(bool value) {
     _isTracking = value;
@@ -168,8 +174,6 @@ class LocationTrackingService {
     try {
       debugPrint('➡️ startTracking(entregaId=$entregaId, motoristaId=$motoristaId)');
 
-      // Tracking usa tabelas com RLS baseado em auth.uid(). Sem sessão Auth,
-      // a inserção de tracking_sessions/locations falhará.
       if (SupabaseConfig.auth.currentUser == null) {
         _lastError = 'Você precisa estar autenticado para iniciar o rastreamento.';
         debugPrint('No Supabase Auth session - cannot start tracking');
@@ -182,20 +186,22 @@ class LocationTrackingService {
         return false;
       }
 
+      // Get motorista email
+      final motorista = await _getMotoristaEmail(motoristaId);
+      if (motorista == null) {
+        _lastError = 'Não foi possível obter o email do motorista.';
+        debugPrint('Failed to get motorista email');
+        return false;
+      }
+      _motoristaEmail = motorista;
+
       // Stop any existing tracking
       await stopTracking();
 
-      // Create tracking session
+      // Set tracking state
       _currentEntregaId = entregaId;
       _currentMotoristaId = motoristaId;
-      _currentSessionId = await _createTrackingSession(entregaId, motoristaId);
-      
-      if (_currentSessionId == null) {
-        // _createTrackingSession já preenche _lastError com a causa (ex.: RLS/schema).
-        _lastError ??= 'Não foi possível criar a sessão de rastreamento no servidor.';
-        debugPrint('Failed to create tracking session');
-        return false;
-      }
+      _currentSessionId = 'tracking-$entregaId-${DateTime.now().millisecondsSinceEpoch}';
 
       // Save state to cache for recovery
       await _saveTrackingState();
@@ -229,9 +235,9 @@ class LocationTrackingService {
       _trackingTimer?.cancel();
       await _positionStream?.cancel();
       
-      // Complete tracking session
-      if (_currentSessionId != null) {
-        await _completeTrackingSession(_currentSessionId!);
+      // Update motorista location to offline
+      if (_motoristaEmail != null) {
+        await _updateMotoristaLocation(null, offline: true);
       }
 
       // Clear state
@@ -241,6 +247,7 @@ class LocationTrackingService {
       _currentEntregaId = null;
       _currentMotoristaId = null;
       _currentSessionId = null;
+      _motoristaEmail = null;
       _lastPosition = null;
       _lastUpdateTime = null;
 
@@ -381,23 +388,42 @@ class LocationTrackingService {
 
   /// Send location to Supabase
   Future<bool> _sendLocationToServer(LocationPoint location) async {
+    if (!_serverTrackingEnabled) return true;
+
     try {
-      final response = await SupabaseConfig.client
-          .from('locations')
-          .insert(location.toJson()..remove('id'))
-          .select()
-          .single();
+      // Get current entrega status from entregas table
+      final entregaResponse = await SupabaseConfig.client
+          .from('entregas')
+          .select('status')
+          .eq('id', location.entregaId)
+          .maybeSingle();
+
+      final currentStatus = entregaResponse?['status'] as String? ?? 'saiu_para_entrega';
+
+      // 1. Insert into tracking_historico (historical points)
+      await SupabaseConfig.client.from('tracking_historico').insert({
+        'entrega_id': location.entregaId,
+        'latitude': location.latitude,
+        'longitude': location.longitude,
+        'observacao': location.isMoving ? 'Em movimento' : 'Parado',
+        'status': currentStatus,
+      });
+
+      // 2. Update localizações (current position) - upsert by motorista email
+      await _updateMotoristaLocation(location);
 
       debugPrint('📍 Location sent: ${location.latitude}, ${location.longitude} | Speed: ${location.speed?.toStringAsFixed(1)} km/h');
       return true;
     } catch (e) {
       debugPrint('Send location to server error: $e');
+      _serverTrackingEnabled = false;
       return false;
     }
   }
 
   /// Sync pending locations when back online
   Future<void> _syncPendingLocations() async {
+    if (!_serverTrackingEnabled) return;
     try {
       final pending = await CacheService.getPendingSync();
       if (pending.isEmpty) return;
@@ -419,47 +445,61 @@ class LocationTrackingService {
     }
   }
 
-  /// Create tracking session in database
-  Future<String?> _createTrackingSession(String entregaId, String motoristaId) async {
+  /// Get motorista email from database
+  Future<String?> _getMotoristaEmail(String motoristaId) async {
     try {
       final response = await SupabaseConfig.client
-          .from('tracking_sessions')
-          .insert({
-            'entrega_id': entregaId,
-            'motorista_id': motoristaId,
-            'status': 'active',
-            'started_at': DateTime.now().toIso8601String(),
-          })
-          .select()
-          .single();
+          .from('motoristas')
+          .select('email')
+          .eq('id', motoristaId)
+          .maybeSingle();
 
-      return response['id'] as String;
+      return response?['email'] as String?;
     } catch (e) {
-      // Surface the root cause to the UI to make debugging RLS/schema issues easier.
-      if (e is PostgrestException) {
-        _lastError = 'Falha ao criar sessão: ${e.message}';
-      } else {
-        _lastError = 'Falha ao criar sessão: $e';
-      }
-      debugPrint('Create tracking session error: $e');
+      debugPrint('Get motorista email error: $e');
       return null;
     }
   }
 
-  /// Complete tracking session
-  Future<void> _completeTrackingSession(String sessionId) async {
-    try {
-      await SupabaseConfig.client
-          .from('tracking_sessions')
-          .update({
-            'status': 'completed',
-            'ended_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', sessionId);
+  /// Update motorista current location in localizações table
+  Future<void> _updateMotoristaLocation(LocationPoint? location, {bool offline = false}) async {
+    if (_motoristaEmail == null) return;
 
-      debugPrint('Tracking session completed: $sessionId');
+    try {
+      if (offline) {
+        // Mark motorista as offline
+        await SupabaseConfig.client.from('localizações').update({
+          'status': false,
+          'visivel': false,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        }).eq('email_motorista', _motoristaEmail!);
+      } else if (location != null) {
+        // Upsert current location
+        final data = {
+          'email_motorista': _motoristaEmail!,
+          'latitude': location.latitude,
+          'longitude': location.longitude,
+          'precisao': location.accuracy,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'status': true,
+          'visivel': true,
+          'heading': location.heading,
+        };
+
+        // Try to update first
+        final updateResult = await SupabaseConfig.client
+            .from('localizações')
+            .update(data)
+            .eq('email_motorista', _motoristaEmail!)
+            .select();
+
+        // If no row was updated, insert new one
+        if (updateResult.isEmpty) {
+          await SupabaseConfig.client.from('localizações').insert(data);
+        }
+      }
     } catch (e) {
-      debugPrint('Complete tracking session error: $e');
+      debugPrint('Update motorista location error: $e');
     }
   }
 
