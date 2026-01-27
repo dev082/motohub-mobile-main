@@ -4,6 +4,7 @@ import 'package:motohub/nav.dart';
 import 'package:motohub/screens/operacao_dia_screen.dart';
 import 'package:motohub/screens/entregas_screen.dart';
 import 'package:motohub/screens/chat_list_screen.dart';
+import 'package:motohub/widgets/tracking_permission_sheet.dart';
 
 /// Main screen with bottom navigation
 class MainScreen extends StatefulWidget {
@@ -72,35 +73,37 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: NavigationBar(
-        animationDuration: const Duration(milliseconds: 360),
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() => _currentIndex = index);
-          context.go('${AppRoutes.home}?tab=${_tabFromIndex(index)}');
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Operação',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.local_shipping_outlined),
-            selectedIcon: Icon(Icons.local_shipping),
-            label: 'Entregas',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Chat',
-          ),
-        ],
+    return TrackingPermissionPromptHost(
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _screens,
+        ),
+        bottomNavigationBar: NavigationBar(
+          animationDuration: const Duration(milliseconds: 360),
+          selectedIndex: _currentIndex,
+          onDestinationSelected: (index) {
+            setState(() => _currentIndex = index);
+            context.go('${AppRoutes.home}?tab=${_tabFromIndex(index)}');
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Operação',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.local_shipping_outlined),
+              selectedIcon: Icon(Icons.local_shipping),
+              label: 'Entregas',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.chat_bubble_outline),
+              selectedIcon: Icon(Icons.chat_bubble),
+              label: 'Chat',
+            ),
+          ],
+        ),
       ),
     );
   }

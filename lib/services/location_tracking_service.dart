@@ -19,6 +19,10 @@ class LocationTrackingService {
   /// Useful for keeping UI (GPS icon) in sync even when tracking starts automatically.
   final ValueNotifier<bool> isTrackingNotifier = ValueNotifier<bool>(false);
 
+  /// Notifies UI when tracking cannot run reliably in background.
+  /// The UI should show a permission/settings prompt when this is non-null.
+  final ValueNotifier<TrackingPermissionIssue?> permissionIssueNotifier = ValueNotifier<TrackingPermissionIssue?>(null);
+
   final Battery _battery = Battery();
   final Connectivity _connectivity = Connectivity();
 
@@ -49,6 +53,7 @@ class LocationTrackingService {
 
   bool get isTracking => _isTracking;
   String? get currentSessionId => _currentSessionId;
+  String? get currentEntregaId => _currentEntregaId;
   String? get lastError => _lastError;
 
   bool get isServerTrackingEnabled => _serverTrackingEnabled;
@@ -100,10 +105,14 @@ class LocationTrackingService {
     });
   }
 
-  /// Check and request permissions
-  Future<bool> checkPermissions() async {
+  /// Check and request permissions.
+  ///
+  /// When [requireAlways] is true, we enforce background permission ("Sempre")
+  /// because the business requirement is continuous tracking during active entregas.
+  Future<bool> checkPermissions({bool requireAlways = false}) async {
     try {
       _lastError = null;
+      permissionIssueNotifier.value = null;
 
       // Check location services
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -125,6 +134,10 @@ class LocationTrackingService {
       if (permission == LocationPermission.deniedForever) {
         _lastError = 'Permissão de localização bloqueada permanentemente.';
         debugPrint('Location permission permanently denied');
+        permissionIssueNotifier.value = TrackingPermissionIssue(
+          type: TrackingPermissionIssueType.deniedForever,
+          message: _lastError!,
+        );
         if (!kIsWeb) {
           // On web there is no app settings page to open.
           await Geolocator.openAppSettings();
@@ -135,7 +148,31 @@ class LocationTrackingService {
       final ok = permission == LocationPermission.always || permission == LocationPermission.whileInUse;
       if (!ok) {
         _lastError = 'Permissão de localização negada.';
+        permissionIssueNotifier.value = TrackingPermissionIssue(
+          type: TrackingPermissionIssueType.denied,
+          message: _lastError!,
+        );
         return false;
+      }
+
+      // Enforce background permission when required.
+      if (requireAlways && !kIsWeb) {
+        final isAlways = permission == LocationPermission.always;
+        if (!isAlways) {
+          // Best effort: ask for "Always" via permission_handler.
+          final req = await Permission.locationAlways.request();
+          debugPrint('Background location permission request result: $req');
+          final after = await Geolocator.checkPermission();
+          debugPrint('Location permission after bg request: $after');
+          if (after != LocationPermission.always) {
+            _lastError = 'Para rastrear em segundo plano, permita Localização "Sempre".';
+            permissionIssueNotifier.value = TrackingPermissionIssue(
+              type: TrackingPermissionIssueType.backgroundNotAllowed,
+              message: _lastError!,
+            );
+            return false;
+          }
+        }
       }
 
       // Android 13+: Foreground tracking via Geolocator uses a notification.
@@ -146,20 +183,16 @@ class LocationTrackingService {
           final req = await Permission.notification.request();
           debugPrint('Notification permission: $req');
         }
-
-        // Request background location when available (best effort).
-        // Some OEMs require it for continuous tracking when app is not in foreground.
-        final bg = await Permission.locationAlways.status;
-        if (!bg.isGranted) {
-          final req = await Permission.locationAlways.request();
-          debugPrint('Background location permission: $req');
-        }
       }
 
       return true;
     } catch (e) {
       _lastError = 'Erro ao checar permissões de localização.';
       debugPrint('Check permissions error: $e');
+      permissionIssueNotifier.value = TrackingPermissionIssue(
+        type: TrackingPermissionIssueType.unknown,
+        message: _lastError!,
+      );
       return false;
     }
   }
@@ -180,7 +213,8 @@ class LocationTrackingService {
         return false;
       }
 
-      final hasPermission = await checkPermissions();
+      // Business rule: if a driver has an active entrega, we must be able to track in background.
+      final hasPermission = await checkPermissions(requireAlways: true);
       if (!hasPermission) {
         debugPrint('No location permission - cannot start tracking. lastError=$_lastError');
         return false;
@@ -401,12 +435,22 @@ class LocationTrackingService {
       final currentStatus = entregaResponse?['status'] as String? ?? 'saiu_para_entrega';
 
       // 1. Insert into tracking_historico (historical points)
-      await SupabaseConfig.client.from('tracking_historico').insert({
+      // We try to populate a richer schema (if columns exist). If the project schema
+      // is missing some columns, we retry by dropping unknown keys.
+      await _insertTrackingHistoricoSafe({
         'entrega_id': location.entregaId,
+        'motorista_id': location.motoristaId,
+        'status': currentStatus,
+        'observacao': location.isMoving ? 'Em movimento' : 'Parado',
         'latitude': location.latitude,
         'longitude': location.longitude,
-        'observacao': location.isMoving ? 'Em movimento' : 'Parado',
-        'status': currentStatus,
+        'accuracy': location.accuracy,
+        'speed': location.speed,
+        'bussola_pos': _normalizeHeading(location.heading),
+        'altitude': location.altitude,
+        'battery_level': location.batteryLevel,
+        'is_moving': location.isMoving,
+        'created_at': location.createdAt.toIso8601String(),
       });
 
       // 2. Update localizações (current position) - upsert by motorista email
@@ -468,11 +512,14 @@ class LocationTrackingService {
     try {
       if (offline) {
         // Mark motorista as offline
-        await SupabaseConfig.client.from('localizações').update({
-          'status': false,
-          'visivel': false,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        }).eq('email_motorista', _motoristaEmail!);
+        await _updateLocalizacoesSafe(
+          {
+            'status': false,
+            'visivel': false,
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+          },
+          emailMotorista: _motoristaEmail!,
+        );
       } else if (location != null) {
         // Upsert current location
         final data = {
@@ -483,23 +530,96 @@ class LocationTrackingService {
           'timestamp': DateTime.now().millisecondsSinceEpoch,
           'status': true,
           'visivel': true,
-          'heading': location.heading,
+          'bussola_pos': _normalizeHeading(location.heading),
         };
 
         // Try to update first
-        final updateResult = await SupabaseConfig.client
-            .from('localizações')
-            .update(data)
-            .eq('email_motorista', _motoristaEmail!)
-            .select();
+        final updateResult = await _updateLocalizacoesSafe(
+          data,
+          emailMotorista: _motoristaEmail!,
+        );
 
         // If no row was updated, insert new one
         if (updateResult.isEmpty) {
-          await SupabaseConfig.client.from('localizações').insert(data);
+          await _insertLocalizacoesSafe(data);
         }
       }
     } catch (e) {
       debugPrint('Update motorista location error: $e');
+    }
+  }
+
+  double? _normalizeHeading(double? heading) {
+    if (heading == null) return null;
+    if (heading.isNaN || !heading.isFinite) return null;
+    // Geolocator can return -1 when heading is unknown.
+    if (heading < 0) return null;
+    // Keep within [0, 360)
+    final normalized = heading % 360.0;
+    return normalized;
+  }
+
+  static final RegExp _missingColumnRegex = RegExp(r"Could not find the '([^']+)' column", caseSensitive: false);
+
+  Future<void> _insertTrackingHistoricoSafe(Map<String, dynamic> data) async {
+    var payload = Map<String, dynamic>.from(data)..removeWhere((k, v) => v == null);
+    for (var i = 0; i < 6; i++) {
+      try {
+        await SupabaseConfig.client.from('tracking_historico').insert(payload);
+        return;
+      } on PostgrestException catch (e) {
+        final match = _missingColumnRegex.firstMatch(e.message);
+        final col = match?.group(1);
+        if (e.code == 'PGRST204' && col != null && payload.containsKey(col)) {
+          debugPrint('tracking_historico missing column "$col". Retrying without it.');
+          payload.remove(col);
+          continue;
+        }
+        rethrow;
+      }
+    }
+  }
+
+  Future<List<dynamic>> _updateLocalizacoesSafe(Map<String, dynamic> data, {required String emailMotorista}) async {
+    var payload = Map<String, dynamic>.from(data)..removeWhere((k, v) => v == null);
+    for (var i = 0; i < 6; i++) {
+      try {
+        final result = await SupabaseConfig.client
+            .from('localizações')
+            .update(payload)
+            .eq('email_motorista', emailMotorista)
+            .select();
+        return result as List<dynamic>;
+      } on PostgrestException catch (e) {
+        final match = _missingColumnRegex.firstMatch(e.message);
+        final col = match?.group(1);
+        if (e.code == 'PGRST204' && col != null && payload.containsKey(col)) {
+          debugPrint('localizações missing column "$col". Retrying without it.');
+          payload.remove(col);
+          continue;
+        }
+        rethrow;
+      }
+    }
+    return const [];
+  }
+
+  Future<void> _insertLocalizacoesSafe(Map<String, dynamic> data) async {
+    var payload = Map<String, dynamic>.from(data)..removeWhere((k, v) => v == null);
+    for (var i = 0; i < 6; i++) {
+      try {
+        await SupabaseConfig.client.from('localizações').insert(payload);
+        return;
+      } on PostgrestException catch (e) {
+        final match = _missingColumnRegex.firstMatch(e.message);
+        final col = match?.group(1);
+        if (e.code == 'PGRST204' && col != null && payload.containsKey(col)) {
+          debugPrint('localizações missing column "$col". Retrying without it.');
+          payload.remove(col);
+          continue;
+        }
+        rethrow;
+      }
     }
   }
 
@@ -552,4 +672,18 @@ class LocationTrackingService {
     _trackingTimer?.cancel();
     _positionStream?.cancel();
   }
+}
+
+enum TrackingPermissionIssueType {
+  denied,
+  deniedForever,
+  backgroundNotAllowed,
+  unknown,
+}
+
+class TrackingPermissionIssue {
+  final TrackingPermissionIssueType type;
+  final String message;
+
+  const TrackingPermissionIssue({required this.type, required this.message});
 }
