@@ -84,6 +84,7 @@ class _TrackingPermissionSheet extends StatelessWidget {
     final title = switch (issue.type) {
       TrackingPermissionIssueType.deniedForever => 'Permissão bloqueada',
       TrackingPermissionIssueType.backgroundNotAllowed => 'Ative localização em segundo plano',
+      TrackingPermissionIssueType.batteryOptimization => 'Desative otimização de bateria',
       TrackingPermissionIssueType.denied => 'Permissão de localização necessária',
       TrackingPermissionIssueType.unknown => 'Não foi possível ativar o rastreamento',
     };
@@ -192,6 +193,7 @@ class _StepsCard extends StatelessWidget {
     final subtitle = switch (type) {
       TrackingPermissionIssueType.backgroundNotAllowed => 'Para rastrear durante a entrega, o app precisa rodar em segundo plano.',
       TrackingPermissionIssueType.deniedForever => 'A permissão foi bloqueada. Você precisa habilitar manualmente nas configurações.',
+      TrackingPermissionIssueType.batteryOptimization => 'Alguns celulares pausam o GPS com a tela desligada. Desative as otimizações de bateria para este app.',
       _ => 'Siga os passos para liberar o rastreamento.',
     };
 

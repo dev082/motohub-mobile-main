@@ -27,6 +27,7 @@ class LocationTrackingService {
   final Connectivity _connectivity = Connectivity();
 
   Timer? _trackingTimer;
+  Timer? _heartbeatTimer;
   StreamSubscription<Position>? _positionStream;
   
   Position? _lastPosition;
@@ -40,6 +41,9 @@ class LocationTrackingService {
   int _batteryLevel = 100;
   String? _lastError;
 
+  int _consecutiveServerErrors = 0;
+  DateTime? _nextServerAttemptAt;
+
   // Server uses "tracking_historico" for location history and "localizações" for current position.
   bool _serverTrackingEnabled = true;
   String? _motoristaEmail;
@@ -51,10 +55,21 @@ class LocationTrackingService {
   static const double _stationaryThresholdKmh = 5.0; // < 5 km/h = stationary
   static const int _maxPendingLocations = 100; // Max locations to queue offline
 
+  // Business requirement: whenever we receive a GPS update, we persist it both as
+  // "current location" and as an historical point.
+  static const bool _writeHistoricoEveryUpdate = true;
+
+  // Heartbeat: even when the device is stopped (or the stream pauses), we keep the
+  // "current location" row fresh so the backend/UI does not mark the driver as offline.
+  static const Duration _heartbeatInterval = Duration(seconds: 15);
+
   bool get isTracking => _isTracking;
   String? get currentSessionId => _currentSessionId;
   String? get currentEntregaId => _currentEntregaId;
   String? get lastError => _lastError;
+  bool get isOnline => _isOnline;
+  int get consecutiveServerErrors => _consecutiveServerErrors;
+  DateTime? get nextServerAttemptAt => _nextServerAttemptAt;
 
   bool get isServerTrackingEnabled => _serverTrackingEnabled;
 
@@ -79,11 +94,17 @@ class LocationTrackingService {
   void _setupConnectivityListener() {
     _connectivity.onConnectivityChanged.listen((results) {
       final wasOnline = _isOnline;
+      // connectivity_plus can be noisy (especially on iOS). We only consider
+      // explicit "none" as offline; otherwise we keep attempting.
       _isOnline = results.isNotEmpty && !results.contains(ConnectivityResult.none);
       
       if (!wasOnline && _isOnline) {
         debugPrint('Device back online - syncing pending locations');
         _syncPendingLocations();
+      }
+
+      if (wasOnline != _isOnline) {
+        debugPrint('Connectivity changed. isOnline=$_isOnline results=$results');
       }
     });
   }
@@ -171,6 +192,26 @@ class LocationTrackingService {
               message: _lastError!,
             );
             return false;
+          }
+        }
+      }
+
+      // Android: request ignoring battery optimizations for reliable background tracking.
+      // Many OEMs will kill background location unless the app is whitelisted.
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android && requireAlways) {
+        final status = await Permission.ignoreBatteryOptimizations.status;
+        if (!status.isGranted) {
+          final req = await Permission.ignoreBatteryOptimizations.request();
+          debugPrint('Ignore battery optimizations permission: $req');
+          final after = await Permission.ignoreBatteryOptimizations.status;
+          if (!after.isGranted) {
+            _lastError = 'Para manter o rastreador com a tela desligada, permita "Ignorar otimizações de bateria".';
+            permissionIssueNotifier.value = TrackingPermissionIssue(
+              type: TrackingPermissionIssueType.batteryOptimization,
+              message: _lastError!,
+            );
+            // We still return true because tracking may work on some devices,
+            // but we notify UI so user can fix reliability.
           }
         }
       }
@@ -267,6 +308,7 @@ class LocationTrackingService {
     try {
       debugPrint('➡️ stopTracking(session=$_currentSessionId)');
       _trackingTimer?.cancel();
+      _heartbeatTimer?.cancel();
       await _positionStream?.cancel();
       
       // Update motorista location to offline
@@ -294,6 +336,7 @@ class LocationTrackingService {
   /// Start location updates with adaptive interval
   Future<void> _primeAndStartLocationUpdates() async {
     _trackingTimer?.cancel();
+    _heartbeatTimer?.cancel();
     _positionStream?.cancel();
 
     // Important: if the driver is stationary, the stream may not emit immediately
@@ -321,6 +364,52 @@ class LocationTrackingService {
       _lastError = 'Falha no stream de localização.';
       debugPrint('Position stream error: $e');
     });
+
+    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) async {
+      try {
+        if (!_isTracking) return;
+        final p = _lastPosition;
+        if (p == null) return;
+        await _sendHeartbeat(p);
+      } catch (e) {
+        debugPrint('Heartbeat error: $e');
+      }
+    });
+  }
+
+  Future<void> _sendHeartbeat(Position position) async {
+    // Only updates the "current" location row (localizações) and keeps a fresh timestamp.
+    // This prevents the backend/client from marking the driver as offline when stationary.
+    if (_currentEntregaId == null || _currentMotoristaId == null) return;
+
+    final now = DateTime.now();
+    final batteryLevel = await _battery.batteryLevel;
+    final speed = _speedKmhFromPosition(position, now: now);
+    final isMoving = speed >= _stationaryThresholdKmh;
+
+    final locationPoint = LocationPoint(
+      id: '',
+      entregaId: _currentEntregaId!,
+      motoristaId: _currentMotoristaId!,
+      latitude: position.latitude,
+      longitude: position.longitude,
+      accuracy: position.accuracy,
+      speed: speed,
+      heading: position.heading,
+      altitude: position.altitude,
+      batteryLevel: batteryLevel,
+      isMoving: isMoving,
+      createdAt: now,
+    );
+
+    final canAttemptServer = _isOnline && (_nextServerAttemptAt == null || now.isAfter(_nextServerAttemptAt!));
+    if (!canAttemptServer) return;
+
+    try {
+      await _updateMotoristaLocation(locationPoint);
+    } catch (e) {
+      debugPrint('Heartbeat server update error: $e');
+    }
   }
 
   LocationSettings _buildLocationSettings() {
@@ -363,7 +452,7 @@ class LocationTrackingService {
 
     // Check if moving or stationary
     if (_lastPosition != null) {
-      final speed = _lastPosition!.speed * 3.6; // m/s to km/h
+      final speed = _speedKmhFromPosition(_lastPosition!, now: DateTime.now());
       if (speed < _stationaryThresholdKmh) {
         return _intervalStationarySeconds; // Stationary
       }
@@ -377,12 +466,13 @@ class LocationTrackingService {
 
     try {
       final now = DateTime.now();
-      final minInterval = Duration(seconds: _getAdaptiveInterval());
-      final last = _lastUpdateTime;
-      if (last != null && now.difference(last) < minInterval) return;
-
       final batteryLevel = await _battery.batteryLevel;
-      final speed = position.speed * 3.6; // Convert m/s to km/h
+      final speed = _speedKmhFromPosition(
+        position,
+        now: now,
+        lastPosition: _lastPosition,
+        lastTime: _lastUpdateTime,
+      );
       final isMoving = speed >= _stationaryThresholdKmh;
 
       final locationPoint = LocationPoint(
@@ -400,14 +490,35 @@ class LocationTrackingService {
         createdAt: now,
       );
 
-      if (_isOnline) {
-        final success = await _sendLocationToServer(locationPoint);
-        if (!success) await CacheService.addToPendingSync(locationPoint);
-      } else {
-        await CacheService.addToPendingSync(locationPoint);
-        final pending = await CacheService.getPendingSync();
-        if (pending.length > _maxPendingLocations) {
-          debugPrint('⚠️ Max pending locations reached - oldest will be discarded');
+      // Near real-time: always try to refresh the "current location" row.
+      // This is what dashboards/maps typically read.
+      final canAttemptServer = _isOnline && (_nextServerAttemptAt == null || now.isAfter(_nextServerAttemptAt!));
+      if (canAttemptServer) {
+        try {
+          await _updateMotoristaLocation(locationPoint);
+        } catch (e) {
+          debugPrint('Realtime current location update error: $e');
+        }
+      }
+
+      // Persist the historical point. By default we write on every GPS update (true real-time).
+      // If needed in the future, this can be reverted to adaptive interval to reduce database writes.
+      final shouldWriteHistorico = _writeHistoricoEveryUpdate;
+
+      if (shouldWriteHistorico) {
+        if (canAttemptServer) {
+          final success = await _sendLocationToServer(locationPoint);
+          if (!success) {
+            await CacheService.addToPendingSync(locationPoint);
+          } else {
+            unawaited(_syncPendingLocations());
+          }
+        } else {
+          await CacheService.addToPendingSync(locationPoint);
+          final pendingCount = (await CacheService.getCacheStats())['pending_sync'] ?? 0;
+          if (pendingCount > _maxPendingLocations) {
+            debugPrint('⚠️ Max pending locations reached ($pendingCount) - oldest may be discarded by storage');
+          }
         }
       }
 
@@ -418,6 +529,36 @@ class LocationTrackingService {
     } catch (e) {
       debugPrint('Handle position update error: $e');
     }
+  }
+
+  double _speedKmhFromPosition(
+    Position position, {
+    required DateTime now,
+    Position? lastPosition,
+    DateTime? lastTime,
+  }) {
+    // 1) Prefer GPS-provided speed (m/s -> km/h)
+    final raw = position.speed;
+    if (raw.isFinite && raw >= 0) {
+      return raw * 3.6;
+    }
+
+    // 2) Fallback: compute from distance between points
+    if (lastPosition != null && lastTime != null) {
+      final dt = now.difference(lastTime).inSeconds;
+      if (dt > 0) {
+        final distance = Geolocator.distanceBetween(
+          lastPosition.latitude,
+          lastPosition.longitude,
+          position.latitude,
+          position.longitude,
+        );
+        final speed = (distance / dt) * 3.6;
+        if (speed.isFinite && speed >= 0) return speed;
+      }
+    }
+
+    return 0;
   }
 
   /// Send location to Supabase
@@ -445,7 +586,10 @@ class LocationTrackingService {
         'latitude': location.latitude,
         'longitude': location.longitude,
         'accuracy': location.accuracy,
+        // Some projects use "speed", others use "velocidade". We send both and
+        // rely on the safe-insert to drop missing columns.
         'speed': location.speed,
+        'velocidade': location.speed,
         'bussola_pos': _normalizeHeading(location.heading),
         'altitude': location.altitude,
         'battery_level': location.batteryLevel,
@@ -457,10 +601,22 @@ class LocationTrackingService {
       await _updateMotoristaLocation(location);
 
       debugPrint('📍 Location sent: ${location.latitude}, ${location.longitude} | Speed: ${location.speed?.toStringAsFixed(1)} km/h');
+      _consecutiveServerErrors = 0;
+      _nextServerAttemptAt = null;
       return true;
     } catch (e) {
       debugPrint('Send location to server error: $e');
-      _serverTrackingEnabled = false;
+      // Do NOT permanently disable server tracking on transient errors.
+      _consecutiveServerErrors++;
+      final backoffSeconds = switch (_consecutiveServerErrors) {
+        1 => 2,
+        2 => 5,
+        3 => 10,
+        4 => 20,
+        _ => 30,
+      };
+      _nextServerAttemptAt = DateTime.now().add(Duration(seconds: backoffSeconds));
+      debugPrint('Server send failed (#$_consecutiveServerErrors). Next attempt after ${_nextServerAttemptAt!.toIso8601String()}');
       return false;
     }
   }
@@ -469,21 +625,24 @@ class LocationTrackingService {
   Future<void> _syncPendingLocations() async {
     if (!_serverTrackingEnabled) return;
     try {
-      final pending = await CacheService.getPendingSync();
-      if (pending.isEmpty) return;
+      final entries = await CacheService.getPendingSyncEntries();
+      if (entries.isEmpty) return;
 
-      debugPrint('🔄 Syncing ${pending.length} pending locations...');
+      debugPrint('🔄 Syncing ${entries.length} pending locations...');
 
-      int synced = 0;
-      for (final location in pending) {
-        final success = await _sendLocationToServer(location);
-        if (success) synced++;
+      var synced = 0;
+      for (final entry in entries.entries) {
+        final success = await _sendLocationToServer(entry.value);
+        if (success) {
+          synced++;
+          await CacheService.removePendingLocation(entry.key);
+        } else {
+          // Respect backoff: stop trying more items until next window.
+          break;
+        }
       }
 
-      if (synced > 0) {
-        await CacheService.clearPendingSync();
-        debugPrint('✅ Synced $synced locations');
-      }
+      if (synced > 0) debugPrint('✅ Synced $synced pending locations');
     } catch (e) {
       debugPrint('Sync pending locations error: $e');
     }
@@ -531,6 +690,9 @@ class LocationTrackingService {
           'status': true,
           'visivel': true,
           'bussola_pos': _normalizeHeading(location.heading),
+          // Same convention as tracking_historico: keep both keys for compatibility.
+          'speed': location.speed,
+          'velocidade': location.speed,
         };
 
         // Try to update first
@@ -670,6 +832,7 @@ class LocationTrackingService {
   Future<void> dispose() async {
     await stopTracking();
     _trackingTimer?.cancel();
+    _heartbeatTimer?.cancel();
     _positionStream?.cancel();
   }
 }
@@ -678,6 +841,7 @@ enum TrackingPermissionIssueType {
   denied,
   deniedForever,
   backgroundNotAllowed,
+  batteryOptimization,
   unknown,
 }
 

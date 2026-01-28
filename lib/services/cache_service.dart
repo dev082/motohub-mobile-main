@@ -100,6 +100,31 @@ class CacheService {
     }
   }
 
+  /// Get all pending locations along with their storage keys.
+  ///
+  /// This enables partial sync (remove only successful uploads).
+  static Future<Map<String, LocationPoint>> getPendingSyncEntries() async {
+    if (!_initialized) await init();
+    try {
+      if (_useMemoryStore) {
+        return _pendingSyncMem.map((k, v) => MapEntry(k, LocationPoint.fromJson(Map<String, dynamic>.from(v))));
+      }
+      final box = _pendingSyncBox;
+      if (box == null) return {};
+      final result = <String, LocationPoint>{};
+      for (final key in box.keys) {
+        final raw = box.get(key);
+        if (raw is Map) {
+          result[key.toString()] = LocationPoint.fromJson(Map<String, dynamic>.from(raw));
+        }
+      }
+      return result;
+    } catch (e) {
+      debugPrint('Get pending sync entries error: $e');
+      return {};
+    }
+  }
+
   /// Clear pending sync queue after successful upload
   static Future<void> clearPendingSync() async {
     if (!_initialized) await init();
