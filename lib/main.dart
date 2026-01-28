@@ -61,7 +61,7 @@ class _MyAppState extends State<MyApp> {
           _router ??= AppRouter.createRouter(context.read<AppProvider>());
           final themeMode = context.watch<AppProvider>().themeMode;
           return MaterialApp.router(
-            title: 'hubfrete',
+            title: 'HubFrete Motoristas',
             debugShowCheckedModeBanner: false,
             theme: lightTheme,
             darkTheme: darkTheme,

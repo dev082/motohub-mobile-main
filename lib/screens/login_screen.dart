@@ -156,7 +156,7 @@ class _LoginBrandHeader extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.lg),
         Text(
-          "HubFrete Motorista",
+          "HubFrete Motoristas",
           textAlign: TextAlign.center,
           style: context.textStyles.headlineMedium
               ?.copyWith(color: onBg, fontWeight: FontWeight.w700),

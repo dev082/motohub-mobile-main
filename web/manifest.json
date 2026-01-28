@@ -1,11 +1,11 @@
 {
-    "name": "motohub",
-    "short_name": "motohub",
+    "name": "HubFrete Motoristas",
+    "short_name": "HubFrete",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Aplicativo para motoristas do HubFrete",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
