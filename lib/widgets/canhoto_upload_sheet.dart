@@ -80,103 +80,122 @@ class _CanhotoUploadSheetState extends State<CanhotoUploadSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: AppSpacing.md,
-          right: AppSpacing.md,
-          top: AppSpacing.md,
-          bottom: AppSpacing.md + MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
+    final mq = MediaQuery.of(context);
+    final viewInsets = mq.viewInsets;
+    final bottomSafe = mq.padding.bottom;
+    final size = mq.size;
+
+    // Full-screen sheet: keep actions above system navigation bar and keyboard.
+    return SizedBox(
+      height: size.height,
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.md, top: AppSpacing.md, bottom: AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Anexar canhoto', style: theme.textTheme.titleLarge),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Para finalizar a entrega, anexe o canhoto (foto ou PDF).',
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _isSubmitting ? null : () => context.pop(false),
+                    icon: const Icon(Icons.close),
+                    color: theme.colorScheme.onSurface,
+                    tooltip: 'Fechar',
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.only(bottom: AppSpacing.lg + viewInsets.bottom),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Anexar canhoto', style: theme.textTheme.titleLarge),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Para finalizar a entrega, anexe o canhoto (foto ou PDF).',
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.4),
+                      AbsorbPointer(
+                        absorbing: _isSubmitting,
+                        child: DocumentPickerTile(
+                          title: 'Canhoto da entrega',
+                          subtitle: 'Obrigatório: foto do canhoto assinado ou PDF.',
+                          required: true,
+                          file: _file,
+                          onPick: _pick,
+                          secondaryLabel: 'Tirar foto',
+                          secondaryIcon: Icons.photo_camera_outlined,
+                          onSecondaryPick: _takePhoto,
+                          onClear: () => setState(() => _file = null),
+                        ),
                       ),
+                      if (_error != null) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.errorContainer,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.error_outline, color: theme.colorScheme.onErrorContainer),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _error!,
+                                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onErrorContainer, height: 1.35),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                IconButton(
-                  onPressed: _isSubmitting ? null : () => context.pop(false),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            AbsorbPointer(
-              absorbing: _isSubmitting,
-              child: DocumentPickerTile(
-                title: 'Canhoto da entrega',
-                subtitle: 'Obrigatório: foto do canhoto assinado ou PDF.',
-                required: true,
-                file: _file,
-                onPick: _pick,
-                secondaryLabel: 'Tirar foto',
-                secondaryIcon: Icons.photo_camera_outlined,
-                onSecondaryPick: _takePhoto,
-                onClear: () => setState(() => _file = null),
               ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
+              const SizedBox(height: AppSpacing.md),
+              Padding(
+                // Guarantees the action bar stays above Android/iOS system gesture/navigation area.
+                padding: EdgeInsets.only(bottom: bottomSafe),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: theme.colorScheme.onErrorContainer),
-                    const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        _error!,
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onErrorContainer, height: 1.35),
+                      child: OutlinedButton(
+                        onPressed: _isSubmitting ? null : () => context.pop(false),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _isSubmitting ? null : _submit,
+                        icon: _isSubmitting
+                            ? SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary),
+                              )
+                            : const Icon(Icons.cloud_upload_outlined, size: 18),
+                        label: Text(_isSubmitting ? 'Enviando…' : 'Anexar e finalizar'),
                       ),
                     ),
                   ],
                 ),
               ),
             ],
-            const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isSubmitting ? null : () => context.pop(false),
-                    child: const Text('Cancelar'),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _isSubmitting ? null : _submit,
-                    icon: _isSubmitting
-                        ? SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary),
-                          )
-                        : const Icon(Icons.cloud_upload_outlined, size: 18),
-                    label: Text(_isSubmitting ? 'Enviando…' : 'Anexar e finalizar'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

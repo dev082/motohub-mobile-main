@@ -200,7 +200,8 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
         final ok = await showModalBottomSheet<bool>(
           context: context,
           isScrollControlled: true,
-          showDragHandle: true,
+          useSafeArea: true,
+          showDragHandle: false,
           builder: (context) => CanhotoUploadSheet(
             onSubmit: (PickedBinaryFile file) async {
               await _entregaService.uploadComprovante(

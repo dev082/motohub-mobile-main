@@ -183,103 +183,138 @@ class DocumentPickerTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: AppSpacing.paddingMd,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final actions = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.end,
+      children: [
+        if (onSecondaryPick != null && secondaryLabel != null) ...[
+          OutlinedButton.icon(
+            onPressed: onSecondaryPick,
+            icon: Icon(secondaryIcon ?? Icons.photo_camera_outlined, size: 18),
+            label: Text(secondaryLabel!),
+          ),
+        ],
+        OutlinedButton.icon(
+          onPressed: onPick,
+          icon: const Icon(Icons.upload_file, size: 18),
+          label: Text(file == null ? 'Anexar' : 'Trocar'),
+        ),
+      ],
+    );
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(required ? '$title *' : title, style: theme.textTheme.titleSmall),
+        if (subtitle != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle!,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        if (file == null)
+          Text(
+            required ? 'Nenhum arquivo anexado (obrigatório).' : 'Nenhum arquivo anexado.',
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          )
+        else
           Container(
-            height: 42,
-            width: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            alignment: Alignment.center,
-            child: Icon(
-              _iconForFile(file?.name),
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(required ? '$title *' : title, style: theme.textTheme.titleSmall),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      height: 1.35,
-                    ),
+                Expanded(
+                  child: Text(
+                    file!.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+                if (onClear != null) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: onClear,
+                    icon: const Icon(Icons.close, size: 18),
                   ),
                 ],
-                const SizedBox(height: 8),
-                if (file == null)
-                  Text(
-                    required ? 'Nenhum arquivo anexado (obrigatório).' : 'Nenhum arquivo anexado.',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            file!.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ),
-                        if (onClear != null) ...[
-                          const SizedBox(width: 8),
-                          IconButton(
-                            onPressed: onClear,
-                            icon: const Icon(Icons.close, size: 18),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
               ],
             ),
           ),
-          const SizedBox(width: AppSpacing.md),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.end,
-            children: [
-              if (onSecondaryPick != null && secondaryLabel != null) ...[
-                OutlinedButton.icon(
-                  onPressed: onSecondaryPick,
-                  icon: Icon(secondaryIcon ?? Icons.photo_camera_outlined, size: 18),
-                  label: Text(secondaryLabel!),
-                ),
-              ],
-              OutlinedButton.icon(
-                onPressed: onPick,
-                icon: const Icon(Icons.upload_file, size: 18),
-                label: Text(file == null ? 'Anexar' : 'Trocar'),
-              ),
-            ],
+      ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 420;
+        return Container(
+          padding: AppSpacing.paddingMd,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
-        ],
-      ),
+          child: isNarrow
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: 42,
+                          width: 42,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            _iconForFile(file?.name),
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(child: content),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Align(alignment: Alignment.centerRight, child: actions),
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 42,
+                      width: 42,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        _iconForFile(file?.name),
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(child: content),
+                    const SizedBox(width: AppSpacing.md),
+                    actions,
+                  ],
+                ),
+        );
+      },
     );
   }
 
