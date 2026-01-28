@@ -573,7 +573,7 @@ class LocationTrackingService {
           .eq('id', location.entregaId)
           .maybeSingle();
 
-      final currentStatus = entregaResponse?['status'] as String? ?? 'saiu_para_entrega';
+      final currentStatus = _sanitizeStatusEntrega(entregaResponse?['status'] as String?);
 
       // 1. Insert into tracking_historico (historical points)
       // We try to populate a richer schema (if columns exist). If the project schema
@@ -604,9 +604,22 @@ class LocationTrackingService {
       _consecutiveServerErrors = 0;
       _nextServerAttemptAt = null;
       return true;
+    } on PostgrestException catch (e) {
+      debugPrint('Send location to server PostgrestException: code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}');
+      // Do NOT permanently disable server tracking on transient errors.
+      _consecutiveServerErrors++;
+      final backoffSeconds = switch (_consecutiveServerErrors) {
+        1 => 2,
+        2 => 5,
+        3 => 10,
+        4 => 20,
+        _ => 30,
+      };
+      _nextServerAttemptAt = DateTime.now().add(Duration(seconds: backoffSeconds));
+      debugPrint('Server send failed (#$_consecutiveServerErrors). Next attempt after ${_nextServerAttemptAt!.toIso8601String()}');
+      return false;
     } catch (e) {
       debugPrint('Send location to server error: $e');
-      // Do NOT permanently disable server tracking on transient errors.
       _consecutiveServerErrors++;
       final backoffSeconds = switch (_consecutiveServerErrors) {
         1 => 2,
@@ -721,6 +734,21 @@ class LocationTrackingService {
     return normalized;
   }
 
+  static const Set<String> _validStatusEntrega = {
+    'aguardando',
+    'saiu_para_coleta',
+    'saiu_para_entrega',
+    'entregue',
+    'problema',
+    'cancelada',
+  };
+
+  String _sanitizeStatusEntrega(String? statusFromDb) {
+    final s = (statusFromDb ?? '').trim();
+    if (_validStatusEntrega.contains(s)) return s;
+    return 'saiu_para_entrega';
+  }
+
   static final RegExp _missingColumnRegex = RegExp(r"Could not find the '([^']+)' column", caseSensitive: false);
 
   Future<void> _insertTrackingHistoricoSafe(Map<String, dynamic> data) async {
@@ -737,6 +765,15 @@ class LocationTrackingService {
           payload.remove(col);
           continue;
         }
+
+        // Common failure: invalid enum value for status.
+        if ((e.code == '22P02' || e.message.toLowerCase().contains('invalid input value for enum')) && payload.containsKey('status')) {
+          debugPrint('tracking_historico: invalid enum status="${payload['status']}". Retrying with a safe status.');
+          payload['status'] = _sanitizeStatusEntrega(null);
+          continue;
+        }
+
+        debugPrint('tracking_historico insert failed: code=${e.code} message=${e.message} details=${e.details} hint=${e.hint} payloadKeys=${payload.keys.toList()}');
         rethrow;
       }
     }
