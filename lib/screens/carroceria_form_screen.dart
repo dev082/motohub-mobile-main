@@ -7,6 +7,7 @@ import 'package:hubfrete/services/carroceria_service.dart';
 import 'package:hubfrete/services/storage_upload_service.dart';
 import 'package:hubfrete/theme.dart';
 import 'package:hubfrete/widgets/attachment_pickers.dart';
+import 'package:hubfrete/utils/app_error_reporter.dart';
 import 'package:provider/provider.dart';
 
 /// Screen for creating/editing a trailer
@@ -201,9 +202,7 @@ class _CarroceriaFormScreenState extends State<CarroceriaFormScreen> {
           : await _carroceriaService.createCarroceria(data);
 
       if (carroceria == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao salvar carroceria')));
-        }
+        if (mounted) AppErrorReporter.report(context, Exception('Falha ao salvar carroceria'), operation: 'salvar carroceria');
         return;
       }
 
@@ -241,11 +240,7 @@ class _CarroceriaFormScreenState extends State<CarroceriaFormScreen> {
       }
     } catch (e) {
       debugPrint('Save carroceria error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e')),
-        );
-      }
+      if (mounted) AppErrorReporter.report(context, e, operation: 'salvar carroceria');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

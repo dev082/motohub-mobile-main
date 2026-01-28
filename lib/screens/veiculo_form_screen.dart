@@ -7,6 +7,7 @@ import 'package:hubfrete/services/storage_upload_service.dart';
 import 'package:hubfrete/services/veiculo_service.dart';
 import 'package:hubfrete/theme.dart';
 import 'package:hubfrete/widgets/attachment_pickers.dart';
+import 'package:hubfrete/utils/app_error_reporter.dart';
 import 'package:provider/provider.dart';
 
 /// Screen for creating/editing a vehicle
@@ -231,9 +232,7 @@ class _VeiculoFormScreenState extends State<VeiculoFormScreen> {
           : await _veiculoService.createVeiculo(data);
 
       if (veiculo == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao salvar veículo')));
-        }
+        if (mounted) AppErrorReporter.report(context, Exception('Falha ao salvar veículo'), operation: 'salvar veículo');
         return;
       }
 
@@ -273,11 +272,7 @@ class _VeiculoFormScreenState extends State<VeiculoFormScreen> {
       }
     } catch (e) {
       debugPrint('Save veiculo error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e')),
-        );
-      }
+      if (mounted) AppErrorReporter.report(context, e, operation: 'salvar veículo');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

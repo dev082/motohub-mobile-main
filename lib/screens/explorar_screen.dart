@@ -9,6 +9,7 @@ import 'package:hubfrete/theme.dart';
 import 'package:hubfrete/widgets/app_drawer.dart';
 import 'package:hubfrete/widgets/carga_card.dart';
 import 'package:hubfrete/widgets/pull_to_refresh.dart';
+import 'package:hubfrete/utils/app_error_reporter.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -63,11 +64,7 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
     } catch (e) {
       debugPrint('ExplorarScreen: Error loading cargas: $e');
       setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao carregar cargas: $e')),
-        );
-      }
+      if (mounted) AppErrorReporter.report(context, e, operation: 'carregar cargas');
     }
   }
 

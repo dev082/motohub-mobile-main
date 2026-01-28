@@ -7,6 +7,7 @@ import 'package:hubfrete/services/chat_service.dart';
 import 'package:hubfrete/services/entrega_service.dart';
 import 'package:hubfrete/theme.dart';
 import 'package:hubfrete/widgets/chat_conversation_card.dart';
+import 'package:hubfrete/utils/app_error_reporter.dart';
 import 'package:provider/provider.dart';
 
 /// Chat history screen - shows chats for delivered/cancelled deliveries (read-only)
@@ -52,8 +53,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao carregar histórico: $e')));
+      AppErrorReporter.report(context, e, operation: 'carregar histórico');
     }
   }
 

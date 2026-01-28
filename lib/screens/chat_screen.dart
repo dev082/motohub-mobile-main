@@ -16,6 +16,7 @@ import 'package:hubfrete/widgets/attachment_pickers.dart';
 import 'package:hubfrete/widgets/chat_attachment_preview.dart';
 import 'package:hubfrete/widgets/chat_details_sheet.dart';
 import 'package:hubfrete/services/storage_upload_service.dart';
+import 'package:hubfrete/utils/app_error_reporter.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -129,8 +130,7 @@ class _ChatScreenState extends State<ChatScreen> {
       debugPrint('Chat load error: $e');
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erro ao abrir chat: $e')));
+      AppErrorReporter.report(context, e, operation: 'abrir chat');
     }
   }
 
@@ -309,8 +309,7 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       debugPrint('Send chat message error: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erro ao enviar: $e')));
+      AppErrorReporter.report(context, e, operation: 'enviar mensagem');
     } finally {
       if (mounted) setState(() => _isSending = false);
     }

@@ -10,6 +10,7 @@ import 'package:hubfrete/widgets/app_drawer.dart';
 import 'package:hubfrete/widgets/chat_conversation_card.dart';
 import 'package:hubfrete/widgets/chat_section.dart';
 import 'package:hubfrete/widgets/pull_to_refresh.dart';
+import 'package:hubfrete/utils/app_error_reporter.dart';
 import 'package:provider/provider.dart';
 
 /// Chat list screen - shows chats for active deliveries
@@ -56,11 +57,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao carregar chats: $e')),
-        );
-      }
+      if (mounted) AppErrorReporter.report(context, e, operation: 'carregar chats');
     }
   }
 

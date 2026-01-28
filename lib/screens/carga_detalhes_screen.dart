@@ -14,6 +14,7 @@ import 'package:hubfrete/nav.dart';
 import 'package:hubfrete/theme.dart';
 import 'package:hubfrete/widgets/entrega_route_preview.dart';
 import 'package:hubfrete/widgets/pull_to_refresh.dart';
+import 'package:hubfrete/utils/app_error_reporter.dart';
 import 'package:provider/provider.dart';
 
 /// Tela de detalhes da Carga.
@@ -172,7 +173,7 @@ class _CargaDetalhesScreenState extends State<CargaDetalhesScreen> {
     } catch (e) {
       debugPrint('CargaDetalhesScreen: accept failed: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha ao aceitar carga: $e')));
+      AppErrorReporter.report(context, e, operation: 'aceitar carga');
     } finally {
       if (mounted) setState(() => _accepting = false);
     }

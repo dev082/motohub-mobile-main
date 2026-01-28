@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:hubfrete/models/app_user_alert.dart';
 import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Local notifications helper with multiple channels support.
@@ -12,6 +13,12 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+
+  // In-app “push-like” alert.
+  // We keep it here (instead of Provider) so any layer can raise an alert.
+  final ValueNotifier<AppUserAlert?> _activeInAppAlert = ValueNotifier<AppUserAlert?>(null);
+  ValueListenable<AppUserAlert?> get activeInAppAlertListenable => _activeInAppAlert;
+  AppUserAlert? get activeInAppAlert => _activeInAppAlert.value;
 
   // Notification channels
   static const String _chatChannelId = 'chat_messages';
@@ -196,6 +203,48 @@ class NotificationService {
     } catch (e) {
       debugPrint('NotificationService.showAlertNotification error: $e');
     }
+  }
+
+  /// OS-level local notification for app errors (network/auth/permissions).
+  ///
+  /// This complements the in-app overlay so the user gets a clear signal.
+  Future<void> showAppErrorNotification(AppUserAlert alert) async {
+    if (!_initialized) await init();
+    if (kIsWeb) return;
+
+    try {
+      const androidDetails = AndroidNotificationDetails(
+        _alertChannelId,
+        _alertChannelName,
+        channelDescription: _alertChannelDescription,
+        importance: Importance.max,
+        priority: Priority.max,
+        playSound: true,
+        enableVibration: true,
+      );
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        interruptionLevel: InterruptionLevel.timeSensitive,
+      );
+      const details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+
+      final id = DateTime.now().millisecondsSinceEpoch.remainder(1 << 31);
+      await _plugin.show(id, alert.title, alert.message, details);
+    } catch (e) {
+      debugPrint('NotificationService.showAppErrorNotification error: $e');
+    }
+  }
+
+  void pushInAppAlert(AppUserAlert alert) {
+    final current = _activeInAppAlert.value;
+    if (current != null && current.code == alert.code && current.message == alert.message) return;
+    _activeInAppAlert.value = alert;
+  }
+
+  void dismissInAppAlert() {
+    _activeInAppAlert.value = null;
   }
 
   /// Show delivery event notification (pickup started, arrived, completed, etc.)

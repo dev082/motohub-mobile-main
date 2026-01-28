@@ -12,6 +12,7 @@ import 'package:hubfrete/services/notification_service.dart';
 import 'package:hubfrete/services/entrega_service.dart';
 import 'package:hubfrete/services/secure_storage_service.dart';
 import 'package:hubfrete/services/storage_upload_service.dart';
+import 'package:hubfrete/models/app_user_alert.dart';
 import 'package:hubfrete/supabase/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -39,6 +40,9 @@ class AppProvider with ChangeNotifier {
   bool _isInitialized = false;
   String? _errorMessage;
 
+  // Kept for potential future “notifications center”. Not currently used by overlay.
+  final List<AppUserAlert> _userAlerts = [];
+
   ThemeMode _themeMode = ThemeMode.system;
 
   String? _chatWallpaperUrl;
@@ -51,6 +55,9 @@ class AppProvider with ChangeNotifier {
     _initializeTrackingService();
     _loadThemeMode();
   }
+
+  static const String _lastAuthUserIdKey = 'last_auth_user_id';
+  static String _cachedMotoristaKey(String userId) => 'cached_motorista_json:$userId';
 
   static const String _themeModeStorageKey = 'app_theme_mode';
 
@@ -116,14 +123,60 @@ class AppProvider with ChangeNotifier {
         return;
       }
 
-      // Se existir sessão (login persistido), carregamos o motorista.
-      // Colocamos timeout defensivo para evitar loading infinito.
-      await loadCurrentMotorista().timeout(const Duration(seconds: 8));
+      // Se existir sessão (login persistido), tentamos carregar o motorista no servidor.
+      // Se estiver sem internet, o select pode falhar/demorAR. Então:
+      // 1) tentamos o servidor com timeout curto
+      // 2) caímos para um cache local do motorista (se existir)
+      final authUserId = user?.id ?? session?.user.id;
+      if (authUserId != null) {
+        await SecureStorageService.write(_lastAuthUserIdKey, authUserId);
+      }
+
+      try {
+        await loadCurrentMotorista().timeout(const Duration(seconds: 6));
+      } catch (e) {
+        debugPrint('Auth bootstrap: loadCurrentMotorista failed/timeout, trying cached motorista. error=$e');
+        await _restoreCachedMotoristaIfPossible();
+      }
     } catch (e) {
       debugPrint('Auth initialization error: $e');
     } finally {
       _isInitialized = true;
       _setLoading(false);
+    }
+  }
+
+  Future<void> _restoreCachedMotoristaIfPossible() async {
+    try {
+      final userId = SupabaseConfig.auth.currentUser?.id ?? await SecureStorageService.read(_lastAuthUserIdKey);
+      if (userId == null || userId.trim().isEmpty) return;
+
+      final raw = await SecureStorageService.read(_cachedMotoristaKey(userId));
+      if (raw == null || raw.trim().isEmpty) return;
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return;
+
+      final motorista = Motorista.fromJson(decoded);
+      _currentMotorista = motorista;
+      await _loadActiveEntregaId();
+      notifyListeners();
+
+      // Não iniciamos realtime aqui (pode estar offline). As telas podem funcionar com cache local.
+      debugPrint('Auth bootstrap: restored cached motorista (${motorista.id}) for offline mode.');
+    } catch (e) {
+      debugPrint('Restore cached motorista error: $e');
+    }
+  }
+
+  Future<void> _persistCachedMotorista(Motorista motorista) async {
+    try {
+      final userId = SupabaseConfig.auth.currentUser?.id ?? motorista.userId;
+      if (userId == null || userId.trim().isEmpty) return;
+      await SecureStorageService.write(_lastAuthUserIdKey, userId);
+      await SecureStorageService.write(_cachedMotoristaKey(userId), jsonEncode(motorista.toJson()));
+    } catch (e) {
+      debugPrint('Persist cached motorista error: $e');
     }
   }
 
@@ -229,6 +282,7 @@ class AppProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
   String? get errorMessage => _errorMessage;
+  AppUserAlert? get activeUserAlert => _userAlerts.isEmpty ? null : _userAlerts.first;
   bool get isAuthenticated => _currentMotorista != null;
   LocationService get locationService => _locationService;
 
@@ -282,6 +336,7 @@ class AppProvider with ChangeNotifier {
       }
 
       _currentMotorista = motorista;
+      await _persistCachedMotorista(motorista);
       notifyListeners();
 
       // Start realtime notifications after login.
@@ -310,6 +365,18 @@ class AppProvider with ChangeNotifier {
       await _stopEntregaAssignmentRealtime();
       
       await _authService.signOut();
+
+      // Clear cached motorista for this user so the app doesn't restore offline after logout.
+      try {
+        final userId = await SecureStorageService.read(_lastAuthUserIdKey);
+        if (userId != null && userId.trim().isNotEmpty) {
+          await SecureStorageService.delete(_cachedMotoristaKey(userId));
+        }
+        await SecureStorageService.delete(_lastAuthUserIdKey);
+      } catch (e) {
+        debugPrint('Clear cached motorista on signOut error: $e');
+      }
+
       _currentMotorista = null;
       _activeEntregaId = null;
       notifyListeners();
@@ -598,12 +665,22 @@ class AppProvider with ChangeNotifier {
   Future<void> loadCurrentMotorista() async {
     _setLoading(true);
     try {
-      final motorista = await _authService.getCurrentMotorista();
+      Motorista? motorista;
+      try {
+        // Defensive timeout: without internet, Postgrest may take a long time.
+        motorista = await _authService.getCurrentMotorista().timeout(const Duration(seconds: 6));
+      } catch (e) {
+        debugPrint('loadCurrentMotorista: remote fetch failed/timeout: $e');
+      }
+
+      // If remote fetch failed but we still have an auth session, try local cache.
+      motorista ??= await _getCachedMotoristaForCurrentUser();
       _currentMotorista = motorista;
       await _loadActiveEntregaId();
       notifyListeners();
 
       if (motorista != null) {
+        await _persistCachedMotorista(motorista);
         await _startChatNotifications();
         await _startEntregaAssignmentRealtime();
 
@@ -614,6 +691,23 @@ class AppProvider with ChangeNotifier {
       debugPrint('Load current motorista error: $e');
     } finally {
       _setLoading(false);
+    }
+  }
+
+  Future<Motorista?> _getCachedMotoristaForCurrentUser() async {
+    try {
+      final userId = SupabaseConfig.auth.currentUser?.id ?? await SecureStorageService.read(_lastAuthUserIdKey);
+      if (userId == null || userId.trim().isEmpty) return null;
+
+      final raw = await SecureStorageService.read(_cachedMotoristaKey(userId));
+      if (raw == null || raw.trim().isEmpty) return null;
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return null;
+      return Motorista.fromJson(decoded);
+    } catch (e) {
+      debugPrint('Get cached motorista error: $e');
+      return null;
     }
   }
 
@@ -654,6 +748,21 @@ class AppProvider with ChangeNotifier {
 
   void clearError() {
     _clearError();
+    notifyListeners();
+  }
+
+  void pushUserAlert(AppUserAlert alert) {
+    // Prevent spamming repeated identical alerts.
+    final exists = _userAlerts.any((a) => a.code == alert.code && a.message == alert.message);
+    if (exists) return;
+    _userAlerts.insert(0, alert);
+    if (_userAlerts.length > 5) _userAlerts.removeRange(5, _userAlerts.length);
+    notifyListeners();
+  }
+
+  void dismissActiveUserAlert() {
+    if (_userAlerts.isEmpty) return;
+    _userAlerts.removeAt(0);
     notifyListeners();
   }
 }

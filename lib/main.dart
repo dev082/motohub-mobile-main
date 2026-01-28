@@ -7,6 +7,7 @@ import 'package:hubfrete/providers/app_provider.dart';
 import 'package:hubfrete/services/cache_service.dart';
 import 'package:hubfrete/services/notification_service.dart';
 import 'package:hubfrete/supabase/supabase_config.dart';
+import 'package:hubfrete/widgets/in_app_error_overlay.dart';
 import 'package:provider/provider.dart';
 import 'theme.dart';
 import 'nav.dart';
@@ -65,6 +66,7 @@ class _MyAppState extends State<MyApp> {
             theme: lightTheme,
             darkTheme: darkTheme,
             themeMode: themeMode,
+            builder: (context, child) => InAppErrorOverlay(child: child ?? const SizedBox.shrink()),
             routerConfig: _router!,
           );
         },

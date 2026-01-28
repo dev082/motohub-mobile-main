@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:hubfrete/models/checklist_veiculo.dart';
 import 'package:hubfrete/services/storage_upload_service.dart';
 import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/utils/app_error_reporter.dart';
 import 'package:provider/provider.dart';
 
 /// Bottom sheet para preencher checklist do veículo antes de iniciar entrega
@@ -63,11 +64,7 @@ class _ChecklistVeiculoSheetState extends State<ChecklistVeiculoSheet> {
     } catch (e) {
       setState(() => _isUploading = false);
       debugPrint('Erro ao adicionar foto no checklist: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao adicionar foto: $e')),
-        );
-      }
+      if (mounted) AppErrorReporter.report(context, e, operation: 'adicionar foto');
     }
   }
 

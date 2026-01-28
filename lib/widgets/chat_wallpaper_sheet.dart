@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:hubfrete/providers/app_provider.dart';
 import 'package:hubfrete/theme.dart';
+import 'package:hubfrete/utils/app_error_reporter.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
@@ -36,8 +37,7 @@ class _ChatWallpaperSheetState extends State<ChatWallpaperSheet> {
     } catch (e) {
       debugPrint('Pick wallpaper (gallery) error: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erro ao selecionar imagem: $e')));
+      AppErrorReporter.report(context, e, operation: 'selecionar imagem');
     }
   }
 
@@ -57,8 +57,7 @@ class _ChatWallpaperSheetState extends State<ChatWallpaperSheet> {
     } catch (e) {
       debugPrint('Pick wallpaper (file) error: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erro ao selecionar arquivo: $e')));
+      AppErrorReporter.report(context, e, operation: 'selecionar arquivo');
     }
   }
 

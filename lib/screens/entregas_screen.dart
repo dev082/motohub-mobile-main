@@ -15,6 +15,7 @@ import 'package:hubfrete/widgets/checklist_veiculo_sheet.dart';
 import 'package:hubfrete/widgets/entrega_card.dart';
 import 'package:hubfrete/widgets/entrega_details_sheet.dart';
 import 'package:hubfrete/widgets/pull_to_refresh.dart';
+import 'package:hubfrete/utils/app_error_reporter.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -223,9 +224,7 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
       setState(() => _upsertEntrega(entrega.copyWith(status: next, updatedAt: DateTime.now())));
     } catch (e) {
       debugPrint('Advance stage error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Não foi possível atualizar o status: $e')));
-      }
+      if (mounted) AppErrorReporter.report(context, e, operation: 'atualizar status');
     } finally {
       if (mounted) setState(() => _updatingEntregaIds.remove(entrega.id));
     }
@@ -280,11 +279,7 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao carregar entregas: $e')),
-        );
-      }
+      if (mounted) AppErrorReporter.report(context, e, operation: 'carregar entregas');
     } finally {
       if (mounted) setState(() => _isRefreshing = false);
     }
