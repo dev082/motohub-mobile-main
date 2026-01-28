@@ -131,6 +131,11 @@ export type Database = {
           quantidade: number | null
           quantidade_paletes: number | null
           regras_carregamento: string | null
+          remetente_cnpj: string | null
+          remetente_contato_nome: string | null
+          remetente_contato_telefone: string | null
+          remetente_nome_fantasia: string | null
+          remetente_razao_social: string | null
           requer_refrigeracao: boolean | null
           status: Database["public"]["Enums"]["status_carga"] | null
           temperatura_max: number | null
@@ -178,6 +183,11 @@ export type Database = {
           quantidade?: number | null
           quantidade_paletes?: number | null
           regras_carregamento?: string | null
+          remetente_cnpj?: string | null
+          remetente_contato_nome?: string | null
+          remetente_contato_telefone?: string | null
+          remetente_nome_fantasia?: string | null
+          remetente_razao_social?: string | null
           requer_refrigeracao?: boolean | null
           status?: Database["public"]["Enums"]["status_carga"] | null
           temperatura_max?: number | null
@@ -225,6 +235,11 @@ export type Database = {
           quantidade?: number | null
           quantidade_paletes?: number | null
           regras_carregamento?: string | null
+          remetente_cnpj?: string | null
+          remetente_contato_nome?: string | null
+          remetente_contato_telefone?: string | null
+          remetente_nome_fantasia?: string | null
+          remetente_razao_social?: string | null
           requer_refrigeracao?: boolean | null
           status?: Database["public"]["Enums"]["status_carga"] | null
           temperatura_max?: number | null
@@ -362,6 +377,128 @@ export type Database = {
             columns: ["motorista_id"]
             isOneToOne: false
             referencedRelation: "motoristas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chamado_mensagens: {
+        Row: {
+          anexo_nome: string | null
+          anexo_url: string | null
+          chamado_id: string
+          conteudo: string
+          created_at: string
+          id: string
+          sender_id: string
+          sender_nome: string
+          sender_tipo: string
+        }
+        Insert: {
+          anexo_nome?: string | null
+          anexo_url?: string | null
+          chamado_id: string
+          conteudo: string
+          created_at?: string
+          id?: string
+          sender_id: string
+          sender_nome: string
+          sender_tipo: string
+        }
+        Update: {
+          anexo_nome?: string | null
+          anexo_url?: string | null
+          chamado_id?: string
+          conteudo?: string
+          created_at?: string
+          id?: string
+          sender_id?: string
+          sender_nome?: string
+          sender_tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chamado_mensagens_chamado_id_fkey"
+            columns: ["chamado_id"]
+            isOneToOne: false
+            referencedRelation: "chamados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chamados: {
+        Row: {
+          atribuido_a: string | null
+          categoria: Database["public"]["Enums"]["categoria_chamado"]
+          codigo: string
+          created_at: string
+          descricao: string
+          empresa_id: number | null
+          id: string
+          prioridade: Database["public"]["Enums"]["prioridade_chamado"]
+          resolucao: string | null
+          resolvido_em: string | null
+          resolvido_por: string | null
+          solicitante_email: string
+          solicitante_nome: string
+          solicitante_tipo: string
+          solicitante_user_id: string | null
+          status: Database["public"]["Enums"]["status_chamado"]
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          atribuido_a?: string | null
+          categoria?: Database["public"]["Enums"]["categoria_chamado"]
+          codigo: string
+          created_at?: string
+          descricao: string
+          empresa_id?: number | null
+          id?: string
+          prioridade?: Database["public"]["Enums"]["prioridade_chamado"]
+          resolucao?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          solicitante_email: string
+          solicitante_nome: string
+          solicitante_tipo: string
+          solicitante_user_id?: string | null
+          status?: Database["public"]["Enums"]["status_chamado"]
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          atribuido_a?: string | null
+          categoria?: Database["public"]["Enums"]["categoria_chamado"]
+          codigo?: string
+          created_at?: string
+          descricao?: string
+          empresa_id?: number | null
+          id?: string
+          prioridade?: Database["public"]["Enums"]["prioridade_chamado"]
+          resolucao?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          solicitante_email?: string
+          solicitante_nome?: string
+          solicitante_tipo?: string
+          solicitante_user_id?: string | null
+          status?: Database["public"]["Enums"]["status_chamado"]
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chamados_atribuido_a_fkey"
+            columns: ["atribuido_a"]
+            isOneToOne: false
+            referencedRelation: "torre_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "chamados_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
         ]
@@ -1092,10 +1229,28 @@ export type Database = {
           },
         ]
       }
+      ia_chat: {
+        Row: {
+          id: number
+          message: Json
+          session_id: string
+        }
+        Insert: {
+          id?: number
+          message: Json
+          session_id: string
+        }
+        Update: {
+          id?: number
+          message?: Json
+          session_id?: string
+        }
+        Relationships: []
+      }
       localizações: {
         Row: {
+          bussola_pos: number | null
           email_motorista: string | null
-          heading: number | null
           historico_url: string | null
           id: number
           latitude: number | null
@@ -1103,11 +1258,12 @@ export type Database = {
           precisao: number | null
           status: boolean | null
           timestamp: number | null
+          velocidade: number | null
           visivel: boolean | null
         }
         Insert: {
+          bussola_pos?: number | null
           email_motorista?: string | null
-          heading?: number | null
           historico_url?: string | null
           id?: number
           latitude?: number | null
@@ -1115,11 +1271,12 @@ export type Database = {
           precisao?: number | null
           status?: boolean | null
           timestamp?: number | null
+          velocidade?: number | null
           visivel?: boolean | null
         }
         Update: {
+          bussola_pos?: number | null
           email_motorista?: string | null
-          heading?: number | null
           historico_url?: string | null
           id?: number
           latitude?: number | null
@@ -1127,6 +1284,7 @@ export type Database = {
           precisao?: number | null
           status?: boolean | null
           timestamp?: number | null
+          velocidade?: number | null
           visivel?: boolean | null
         }
         Relationships: [
@@ -1441,6 +1599,60 @@ export type Database = {
         }
         Relationships: []
       }
+      pre_cadastros: {
+        Row: {
+          analisado_em: string | null
+          analisado_por: string | null
+          cnpj: string | null
+          cpf: string | null
+          created_at: string
+          email: string
+          id: string
+          motivo_rejeicao: string | null
+          nome: string
+          nome_empresa: string | null
+          observacoes: string | null
+          status: Database["public"]["Enums"]["status_pre_cadastro"]
+          telefone: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          analisado_em?: string | null
+          analisado_por?: string | null
+          cnpj?: string | null
+          cpf?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          motivo_rejeicao?: string | null
+          nome: string
+          nome_empresa?: string | null
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["status_pre_cadastro"]
+          telefone?: string | null
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          analisado_em?: string | null
+          analisado_por?: string | null
+          cnpj?: string | null
+          cpf?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          motivo_rejeicao?: string | null
+          nome?: string
+          nome_empresa?: string | null
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["status_pre_cadastro"]
+          telefone?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       provas_entrega: {
         Row: {
           assinatura_url: string | null
@@ -1548,8 +1760,42 @@ export type Database = {
         }
         Relationships: []
       }
+      torre_users: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          email: string | null
+          id: string
+          nome: string | null
+          role: Database["public"]["Enums"]["admin_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome?: string | null
+          role?: Database["public"]["Enums"]["admin_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome?: string | null
+          role?: Database["public"]["Enums"]["admin_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tracking_historico: {
         Row: {
+          bussola_pos: number | null
           created_at: string | null
           entrega_id: string
           id: string
@@ -1557,8 +1803,10 @@ export type Database = {
           longitude: number | null
           observacao: string | null
           status: Database["public"]["Enums"]["status_entrega"]
+          velocidade: number | null
         }
         Insert: {
+          bussola_pos?: number | null
           created_at?: string | null
           entrega_id: string
           id?: string
@@ -1566,8 +1814,10 @@ export type Database = {
           longitude?: number | null
           observacao?: string | null
           status: Database["public"]["Enums"]["status_entrega"]
+          velocidade?: number | null
         }
         Update: {
+          bussola_pos?: number | null
           created_at?: string | null
           entrega_id?: string
           id?: string
@@ -1575,6 +1825,7 @@ export type Database = {
           longitude?: number | null
           observacao?: string | null
           status?: Database["public"]["Enums"]["status_entrega"]
+          velocidade?: number | null
         }
         Relationships: [
           {
@@ -1901,9 +2152,20 @@ export type Database = {
         Args: { p_entrega_id: string }
         Returns: string
       }
+      get_admin_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["admin_role"]
+      }
       get_user_empresa_id: { Args: { _user_id: string }; Returns: number }
       get_user_empresa_tipo: { Args: { _user_id: string }; Returns: string }
       get_user_filial_ids: { Args: { _user_id: string }; Returns: number[] }
+      has_admin_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["admin_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1915,6 +2177,7 @@ export type Database = {
         Args: { email: string; password: string }
         Returns: string
       }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_chat_participant: {
         Args: { p_chat_id: string; p_user_id: string }
         Returns: boolean
@@ -1929,7 +2192,15 @@ export type Database = {
       }
     }
     Enums: {
+      admin_role: "super_admin" | "admin" | "suporte"
       app_role: "admin" | "embarcador" | "transportadora" | "motorista"
+      categoria_chamado:
+        | "suporte_tecnico"
+        | "financeiro"
+        | "operacional"
+        | "reclamacao"
+        | "sugestao"
+        | "outros"
       classe_empresa: "INDÚSTRIA" | "LOJA" | "COMÉRCIO"
       forma_pagamento:
         | "a_vista"
@@ -1937,7 +2208,14 @@ export type Database = {
         | "faturado_14"
         | "faturado_21"
         | "faturado_30"
+      prioridade_chamado: "baixa" | "media" | "alta" | "urgente"
       status_carga: "publicada" | "parcialmente_alocada" | "totalmente_alocada"
+      status_chamado:
+        | "aberto"
+        | "em_andamento"
+        | "aguardando_resposta"
+        | "resolvido"
+        | "fechado"
       status_entrega:
         | "aguardando"
         | "saiu_para_coleta"
@@ -1945,6 +2223,7 @@ export type Database = {
         | "entregue"
         | "problema"
         | "cancelada"
+      status_pre_cadastro: "pendente" | "aprovado" | "rejeitado"
       tipo_cadastro_motorista: "autonomo" | "frota"
       tipo_carga:
         | "granel_solido"
@@ -2131,7 +2410,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      admin_role: ["super_admin", "admin", "suporte"],
       app_role: ["admin", "embarcador", "transportadora", "motorista"],
+      categoria_chamado: [
+        "suporte_tecnico",
+        "financeiro",
+        "operacional",
+        "reclamacao",
+        "sugestao",
+        "outros",
+      ],
       classe_empresa: ["INDÚSTRIA", "LOJA", "COMÉRCIO"],
       forma_pagamento: [
         "a_vista",
@@ -2140,7 +2428,15 @@ export const Constants = {
         "faturado_21",
         "faturado_30",
       ],
+      prioridade_chamado: ["baixa", "media", "alta", "urgente"],
       status_carga: ["publicada", "parcialmente_alocada", "totalmente_alocada"],
+      status_chamado: [
+        "aberto",
+        "em_andamento",
+        "aguardando_resposta",
+        "resolvido",
+        "fechado",
+      ],
       status_entrega: [
         "aguardando",
         "saiu_para_coleta",
@@ -2149,6 +2445,7 @@ export const Constants = {
         "problema",
         "cancelada",
       ],
+      status_pre_cadastro: ["pendente", "aprovado", "rejeitado"],
       tipo_cadastro_motorista: ["autonomo", "frota"],
       tipo_carga: [
         "granel_solido",

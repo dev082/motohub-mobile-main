@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hubfrete/models/location_point.dart';
 import 'package:hubfrete/models/tracking_session.dart';
 import 'package:hubfrete/services/cache_service.dart';
+import 'package:hubfrete/services/persistent_background_tracking_service.dart';
 import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Advanced location tracking service with adaptive intervals and battery optimization
@@ -240,6 +241,35 @@ class LocationTrackingService {
 
   /// Start tracking for a delivery
   Future<bool> startTracking(String entregaId, String motoristaId) async {
+    return _startTrackingInternal(
+      entregaId: entregaId,
+      motoristaId: motoristaId,
+      enforcePermissions: true,
+      startPersistentServiceOnAndroid: true,
+      sendUserNotification: true,
+    );
+  }
+
+  /// Entry-point used by the Android foreground service isolate.
+  ///
+  /// Important: we must NOT trigger permission prompts from a background isolate.
+  Future<bool> startTrackingFromBackground(String entregaId, String motoristaId) async {
+    return _startTrackingInternal(
+      entregaId: entregaId,
+      motoristaId: motoristaId,
+      enforcePermissions: false,
+      startPersistentServiceOnAndroid: false,
+      sendUserNotification: false,
+    );
+  }
+
+  Future<bool> _startTrackingInternal({
+    required String entregaId,
+    required String motoristaId,
+    required bool enforcePermissions,
+    required bool startPersistentServiceOnAndroid,
+    required bool sendUserNotification,
+  }) async {
     if (_isTracking && _currentEntregaId == entregaId) {
       debugPrint('Tracking already active for this entrega');
       return true;
@@ -254,14 +284,16 @@ class LocationTrackingService {
         return false;
       }
 
-      // Business rule: if a driver has an active entrega, we must be able to track in background.
-      final hasPermission = await checkPermissions(requireAlways: true);
-      if (!hasPermission) {
-        debugPrint('No location permission - cannot start tracking. lastError=$_lastError');
-        return false;
+      if (enforcePermissions) {
+        // Business rule: if a driver has an active entrega, we must be able to track in background.
+        final hasPermission = await checkPermissions(requireAlways: true);
+        if (!hasPermission) {
+          debugPrint('No location permission - cannot start tracking. lastError=$_lastError');
+          return false;
+        }
       }
 
-      // Get motorista email
+      // Get motorista email (used to upsert current location + offline marker)
       final motorista = await _getMotoristaEmail(motoristaId);
       if (motorista == null) {
         _lastError = 'Não foi possível obter o email do motorista.';
@@ -270,7 +302,7 @@ class LocationTrackingService {
       }
       _motoristaEmail = motorista;
 
-      // Stop any existing tracking
+      // Stop any existing tracking in this isolate
       await stopTracking();
 
       // Set tracking state
@@ -281,16 +313,27 @@ class LocationTrackingService {
       // Save state to cache for recovery
       await _saveTrackingState();
 
-      // Start location updates with adaptive interval
+      // Android: prefer the real foreground service for persistence (survives task removal).
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        _setIsTracking(true);
+        if (startPersistentServiceOnAndroid) {
+          unawaited(PersistentBackgroundTrackingService.instance.start(entregaId: entregaId, motoristaId: motoristaId));
+          debugPrint('✅ Tracking delegated to Android foreground service');
+          if (sendUserNotification) {
+            await _sendNotification('Rastreamento Iniciado', 'Sua localização está sendo compartilhada em tempo real', tipo: 'coleta_iniciada');
+          }
+          return true;
+        }
+      }
+
+      // iOS / other platforms: run tracking in-app (background location mode is handled by OS).
       _setIsTracking(true);
       await _primeAndStartLocationUpdates();
 
       debugPrint('✅ Tracking started for entrega $entregaId');
-      await _sendNotification(
-        'Rastreamento Iniciado',
-        'Sua localização está sendo compartilhada em tempo real',
-        tipo: 'coleta_iniciada',
-      );
+      if (sendUserNotification) {
+        await _sendNotification('Rastreamento Iniciado', 'Sua localização está sendo compartilhada em tempo real', tipo: 'coleta_iniciada');
+      }
 
       return true;
     } catch (e) {
@@ -302,11 +345,16 @@ class LocationTrackingService {
   }
 
   /// Stop tracking
-  Future<void> stopTracking() async {
+  Future<void> stopTracking({bool stopPersistentService = true}) async {
     if (!_isTracking) return;
 
     try {
       debugPrint('➡️ stopTracking(session=$_currentSessionId)');
+
+      if (stopPersistentService && !kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        unawaited(PersistentBackgroundTrackingService.instance.stop());
+      }
+
       _trackingTimer?.cancel();
       _heartbeatTimer?.cancel();
       await _positionStream?.cancel();
@@ -575,30 +623,9 @@ class LocationTrackingService {
 
       final currentStatus = _sanitizeStatusEntrega(entregaResponse?['status'] as String?);
 
-      // 1. Insert into tracking_historico (historical points)
-      // We try to populate a richer schema (if columns exist). If the project schema
-      // is missing some columns, we retry by dropping unknown keys.
-      await _insertTrackingHistoricoSafe({
-        'entrega_id': location.entregaId,
-        'motorista_id': location.motoristaId,
-        'status': currentStatus,
-        'observacao': location.isMoving ? 'Em movimento' : 'Parado',
-        'latitude': location.latitude,
-        'longitude': location.longitude,
-        'accuracy': location.accuracy,
-        // Some projects use "speed", others use "velocidade". We send both and
-        // rely on the safe-insert to drop missing columns.
-        'speed': location.speed,
-        'velocidade': location.speed,
-        'bussola_pos': _normalizeHeading(location.heading),
-        'altitude': location.altitude,
-        'battery_level': location.batteryLevel,
-        'is_moving': location.isMoving,
-        'created_at': location.createdAt.toIso8601String(),
-      });
-
-      // 2. Update localizações (current position) - upsert by motorista email
-      await _updateMotoristaLocation(location);
+      // Update localizações (current position) - upsert by motorista email.
+      // A database trigger will automatically sync this to tracking_historico.
+      await _updateMotoristaLocation(location, statusEntrega: currentStatus);
 
       debugPrint('📍 Location sent: ${location.latitude}, ${location.longitude} | Speed: ${location.speed?.toStringAsFixed(1)} km/h');
       _consecutiveServerErrors = 0;
@@ -677,8 +704,9 @@ class LocationTrackingService {
     }
   }
 
-  /// Update motorista current location in localizações table
-  Future<void> _updateMotoristaLocation(LocationPoint? location, {bool offline = false}) async {
+  /// Update motorista current location in localizações table.
+  /// The database trigger will automatically sync this to tracking_historico.
+  Future<void> _updateMotoristaLocation(LocationPoint? location, {bool offline = false, String? statusEntrega}) async {
     if (_motoristaEmail == null) return;
 
     try {
@@ -693,8 +721,11 @@ class LocationTrackingService {
           emailMotorista: _motoristaEmail!,
         );
       } else if (location != null) {
-        // Upsert current location
-        final data = {
+        // Upsert current location.
+        // IMPORTANT: Keep this aligned with the current DB schema (see lib/supabase/database.types.ts).
+        // Table public."localizações" columns available today:
+        // - email_motorista, latitude, longitude, precisao, bussola_pos, velocidade, status, visivel, timestamp
+        final data = <String, dynamic>{
           'email_motorista': _motoristaEmail!,
           'latitude': location.latitude,
           'longitude': location.longitude,
@@ -703,8 +734,7 @@ class LocationTrackingService {
           'status': true,
           'visivel': true,
           'bussola_pos': _normalizeHeading(location.heading),
-          // Same convention as tracking_historico: keep both keys for compatibility.
-          'speed': location.speed,
+          // velocidade is stored in km/h in our app logic.
           'velocidade': location.speed,
         };
 
@@ -750,34 +780,6 @@ class LocationTrackingService {
   }
 
   static final RegExp _missingColumnRegex = RegExp(r"Could not find the '([^']+)' column", caseSensitive: false);
-
-  Future<void> _insertTrackingHistoricoSafe(Map<String, dynamic> data) async {
-    var payload = Map<String, dynamic>.from(data)..removeWhere((k, v) => v == null);
-    for (var i = 0; i < 6; i++) {
-      try {
-        await SupabaseConfig.client.from('tracking_historico').insert(payload);
-        return;
-      } on PostgrestException catch (e) {
-        final match = _missingColumnRegex.firstMatch(e.message);
-        final col = match?.group(1);
-        if (e.code == 'PGRST204' && col != null && payload.containsKey(col)) {
-          debugPrint('tracking_historico missing column "$col". Retrying without it.');
-          payload.remove(col);
-          continue;
-        }
-
-        // Common failure: invalid enum value for status.
-        if ((e.code == '22P02' || e.message.toLowerCase().contains('invalid input value for enum')) && payload.containsKey('status')) {
-          debugPrint('tracking_historico: invalid enum status="${payload['status']}". Retrying with a safe status.');
-          payload['status'] = _sanitizeStatusEntrega(null);
-          continue;
-        }
-
-        debugPrint('tracking_historico insert failed: code=${e.code} message=${e.message} details=${e.details} hint=${e.hint} payloadKeys=${payload.keys.toList()}');
-        rethrow;
-      }
-    }
-  }
 
   Future<List<dynamic>> _updateLocalizacoesSafe(Map<String, dynamic> data, {required String emailMotorista}) async {
     var payload = Map<String, dynamic>.from(data)..removeWhere((k, v) => v == null);
@@ -843,6 +845,14 @@ class LocationTrackingService {
         _currentEntregaId = entregaId;
         _currentMotoristaId = motoristaId;
         _currentSessionId = sessionId;
+
+        // Android: ensure the foreground service is running (most persistent option).
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+          _setIsTracking(true);
+          unawaited(PersistentBackgroundTrackingService.instance.start(entregaId: entregaId, motoristaId: motoristaId));
+          return;
+        }
+
         _setIsTracking(true);
         await _primeAndStartLocationUpdates();
       }

@@ -256,11 +256,8 @@ class EntregaService {
         debugPrint('EntregaService._insertTrackingHistory: failed to read cached location: $e');
       }
 
-      final motoristaId = last?.motoristaId ?? await CacheService.getTrackingState<String>('current_motorista_id');
-
       final basePayload = <String, dynamic>{
         'entrega_id': entregaId,
-        'motorista_id': motoristaId,
         'status': status.value,
         'observacao': observacao,
         'latitude': last?.latitude,
