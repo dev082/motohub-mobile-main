@@ -70,12 +70,14 @@ class _LoginScreenState extends State<LoginScreen> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                   colors: [
-                    scheme.primary.withValues(alpha: 0.20),
+                    scheme.primaryContainer,
+                    scheme.primary.withValues(alpha: 0.92),
                     scheme.surface,
                   ],
+                  stops: const [0.0, 0.55, 1.0],
                 ),
               ),
             ),
@@ -112,7 +114,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           emailController: _emailController,
                           passwordController: _passwordController,
                           obscurePassword: _obscurePassword,
-                          onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+                          onToggleObscure: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
                           onSubmit: _handleLogin,
                         ),
                       ],
@@ -148,19 +151,22 @@ class _LoginBrandHeader extends StatelessWidget {
             color: scheme.primary.withValues(alpha: 0.18),
             border: Border.all(color: scheme.outline.withValues(alpha: 0.18)),
           ),
-          child: Icon(Icons.local_shipping_rounded, color: scheme.primary, size: 28),
+          child: Icon(Icons.local_shipping_rounded,
+              color: scheme.primary, size: 28),
         ),
         const SizedBox(height: AppSpacing.lg),
         Text(
-          title,
+          "HubFrete Motorista",
           textAlign: TextAlign.center,
-          style: context.textStyles.headlineMedium?.copyWith(color: onBg, fontWeight: FontWeight.w700),
+          style: context.textStyles.headlineMedium
+              ?.copyWith(color: onBg, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
           subtitle,
           textAlign: TextAlign.center,
-          style: context.textStyles.bodyMedium?.copyWith(color: onBg.withValues(alpha: 0.70), height: 1.5),
+          style: context.textStyles.bodyMedium
+              ?.copyWith(color: onBg.withValues(alpha: 0.70), height: 1.5),
         ),
       ],
     );
@@ -209,7 +215,8 @@ class _LoginCard extends StatelessWidget {
               style: context.textStyles.bodyMedium?.copyWith(color: onBg),
               decoration: InputDecoration(
                 hintText: 'seuemail@exemplo.com',
-                prefixIcon: Icon(Icons.email_outlined, color: onBg.withValues(alpha: 0.70)),
+                prefixIcon: Icon(Icons.email_outlined,
+                    color: onBg.withValues(alpha: 0.70)),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) return 'Digite seu email';
@@ -227,17 +234,21 @@ class _LoginCard extends StatelessWidget {
               style: context.textStyles.bodyMedium?.copyWith(color: onBg),
               decoration: InputDecoration(
                 hintText: '••••••••',
-                prefixIcon: Icon(Icons.lock_outline, color: onBg.withValues(alpha: 0.70)),
+                prefixIcon: Icon(Icons.lock_outline,
+                    color: onBg.withValues(alpha: 0.70)),
                 suffixIcon: IconButton(
                   tooltip: obscurePassword ? 'Mostrar senha' : 'Ocultar senha',
                   onPressed: onToggleObscure,
                   icon: Icon(
-                    obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                    obscurePassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
                     color: onBg.withValues(alpha: 0.70),
                   ),
                 ),
               ),
-              validator: (value) => (value == null || value.isEmpty) ? 'Digite sua senha' : null,
+              validator: (value) =>
+                  (value == null || value.isEmpty) ? 'Digite sua senha' : null,
             ),
             const SizedBox(height: AppSpacing.lg),
             Consumer<AppProvider>(
@@ -248,7 +259,8 @@ class _LoginCard extends StatelessWidget {
                     backgroundColor: scheme.primary,
                     foregroundColor: scheme.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.xl)),
                   ),
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 180),
@@ -259,15 +271,21 @@ class _LoginCard extends StatelessWidget {
                             key: const ValueKey('loading'),
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2.2, color: scheme.onPrimary),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.2, color: scheme.onPrimary),
                           )
                         : Row(
                             key: const ValueKey('cta'),
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text('Entrar', style: context.textStyles.labelLarge?.copyWith(color: scheme.onPrimary, fontWeight: FontWeight.w700)),
+                              Text('Entrar',
+                                  style: context.textStyles.labelLarge
+                                      ?.copyWith(
+                                          color: scheme.onPrimary,
+                                          fontWeight: FontWeight.w700)),
                               const SizedBox(width: AppSpacing.sm),
-                              Icon(Icons.arrow_forward_rounded, size: 18, color: scheme.onPrimary),
+                              Icon(Icons.arrow_forward_rounded,
+                                  size: 18, color: scheme.onPrimary),
                             ],
                           ),
                   ),
@@ -279,14 +297,18 @@ class _LoginCard extends StatelessWidget {
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: const Text('Fale com o suporte para recuperar sua senha.'),
+                    content: const Text(
+                        'Fale com o suporte para recuperar sua senha.'),
                     backgroundColor: scheme.surfaceContainerHighest,
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
               },
-              style: TextButton.styleFrom(foregroundColor: onBg.withValues(alpha: 0.70)),
-              child: Text('Esqueci minha senha', style: context.textStyles.labelMedium?.copyWith(color: onBg.withValues(alpha: 0.70))),
+              style: TextButton.styleFrom(
+                  foregroundColor: onBg.withValues(alpha: 0.70)),
+              child: Text('Esqueci minha senha',
+                  style: context.textStyles.labelMedium
+                      ?.copyWith(color: onBg.withValues(alpha: 0.70))),
             ),
           ],
         ),
