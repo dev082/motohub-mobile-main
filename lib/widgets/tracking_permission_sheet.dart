@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:motohub/services/location_tracking_service.dart';
+import 'package:hubfrete/services/location_tracking_service.dart';
 
 /// Hosts a bottom-sheet prompt asking the user to enable background location.
 ///

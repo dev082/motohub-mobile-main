@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Local notifications helper with multiple channels support.
 ///

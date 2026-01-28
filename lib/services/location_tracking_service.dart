@@ -5,10 +5,10 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:motohub/models/location_point.dart';
-import 'package:motohub/models/tracking_session.dart';
-import 'package:motohub/services/cache_service.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/location_point.dart';
+import 'package:hubfrete/models/tracking_session.dart';
+import 'package:hubfrete/services/cache_service.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Advanced location tracking service with adaptive intervals and battery optimization
 class LocationTrackingService {

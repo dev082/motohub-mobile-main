@@ -1,10 +1,12 @@
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/entrega.dart';
-import 'package:motohub/services/location_tracking_service.dart';
-import 'package:motohub/services/notification_service.dart';
-import 'package:motohub/services/storage_upload_service.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/entrega.dart';
+import 'package:hubfrete/models/location_point.dart';
+import 'package:hubfrete/services/cache_service.dart';
+import 'package:hubfrete/services/location_tracking_service.dart';
+import 'package:hubfrete/services/notification_service.dart';
+import 'package:hubfrete/services/storage_upload_service.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for managing entregas (deliveries)
@@ -244,15 +246,60 @@ class EntregaService {
   /// Insert tracking history
   Future<void> _insertTrackingHistory(String entregaId, StatusEntrega status, String? observacao) async {
     try {
-      await SupabaseConfig.client.from('tracking_historico').insert({
+      // Best-effort: attach last known location/heading to the status event.
+      // This helps the backend correlate status transitions with a map point.
+      LocationPoint? last;
+      try {
+        final cached = await CacheService.getCachedLocations(entregaId, limit: 1);
+        if (cached.isNotEmpty) last = cached.first;
+      } catch (e) {
+        debugPrint('EntregaService._insertTrackingHistory: failed to read cached location: $e');
+      }
+
+      final motoristaId = last?.motoristaId ?? await CacheService.getTrackingState<String>('current_motorista_id');
+
+      final basePayload = <String, dynamic>{
         'entrega_id': entregaId,
+        'motorista_id': motoristaId,
         'status': status.value,
         'observacao': observacao,
+        'latitude': last?.latitude,
+        'longitude': last?.longitude,
+        // Column used by the existing tracking upload pipeline.
+        'bussola_pos': _normalizeHeading(last?.heading),
         'created_at': DateTime.now().toIso8601String(),
-      });
+      }..removeWhere((k, v) => v == null);
+
+      var payload = Map<String, dynamic>.from(basePayload);
+      for (var i = 0; i < 6; i++) {
+        try {
+          await SupabaseConfig.client.from('tracking_historico').insert(payload);
+          debugPrint('✅ tracking_historico(status) inserted: $payload');
+          return;
+        } on PostgrestException catch (e) {
+          final match = _missingColumnRegex.firstMatch(e.message);
+          final col = match?.group(1);
+          if (e.code == 'PGRST204' && col != null && payload.containsKey(col)) {
+            debugPrint('tracking_historico missing column "$col". Retrying without it.');
+            payload.remove(col);
+            continue;
+          }
+          debugPrint('Insert tracking history PostgrestException: ${e.code} ${e.message}');
+          rethrow;
+        }
+      }
     } catch (e) {
       debugPrint('Insert tracking history error: $e');
     }
+  }
+
+  static final RegExp _missingColumnRegex = RegExp(r"Could not find the '([^']+)' column", caseSensitive: false);
+
+  double? _normalizeHeading(double? heading) {
+    if (heading == null) return null;
+    if (heading.isNaN || !heading.isFinite) return null;
+    if (heading < 0) return null;
+    return heading % 360.0;
   }
 
   /// Upload comprovante (POD) for coleta/entrega.

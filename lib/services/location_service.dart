@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:motohub/models/entrega.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/entrega.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Service for managing location tracking
 class LocationService {

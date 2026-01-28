@@ -1,5 +1,5 @@
-import 'package:motohub/models/carga.dart';
-import 'package:motohub/models/checklist_veiculo.dart';
+import 'package:hubfrete/models/carga.dart';
+import 'package:hubfrete/models/checklist_veiculo.dart';
 
 /// Entrega model representing delivery assignments from Supabase
 class Entrega {

@@ -5,8 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:motohub/providers/app_provider.dart';
-import 'package:motohub/theme.dart';
+import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/theme.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 

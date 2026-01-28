@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/motorista.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/motorista.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for motorista authentication

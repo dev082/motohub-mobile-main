@@ -1,11 +1,11 @@
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/entrega.dart';
-import 'package:motohub/models/relatorio_motorista.dart';
-import 'package:motohub/services/location_service.dart';
-import 'package:motohub/services/entrega_service.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/entrega.dart';
+import 'package:hubfrete/models/relatorio_motorista.dart';
+import 'package:hubfrete/services/location_service.dart';
+import 'package:hubfrete/services/entrega_service.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Builds aggregated metrics for the Relatórios screen.
 ///

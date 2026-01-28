@@ -3,10 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
-import 'package:motohub/providers/app_provider.dart';
-import 'package:motohub/services/cache_service.dart';
-import 'package:motohub/services/notification_service.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/services/cache_service.dart';
+import 'package:hubfrete/services/notification_service.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 import 'package:provider/provider.dart';
 import 'theme.dart';
 import 'nav.dart';
@@ -60,7 +60,7 @@ class _MyAppState extends State<MyApp> {
           _router ??= AppRouter.createRouter(context.read<AppProvider>());
           final themeMode = context.watch<AppProvider>().themeMode;
           return MaterialApp.router(
-            title: 'Hub Frete Driver',
+            title: 'hubfrete',
             debugShowCheckedModeBanner: false,
             theme: lightTheme,
             darkTheme: darkTheme,

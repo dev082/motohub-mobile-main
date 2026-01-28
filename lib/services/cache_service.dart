@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:motohub/models/location_point.dart';
+import 'package:hubfrete/models/location_point.dart';
 
 /// Offline-first cache service using Hive
 class CacheService {

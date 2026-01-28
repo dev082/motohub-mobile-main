@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:motohub/models/carga.dart';
-import 'package:motohub/models/entrega.dart';
-import 'package:motohub/services/entrega_service.dart';
-import 'package:motohub/services/route_service.dart';
-import 'package:motohub/theme.dart';
-import 'package:motohub/widgets/entrega_details_sheet.dart';
+import 'package:hubfrete/models/carga.dart';
+import 'package:hubfrete/models/entrega.dart';
+import 'package:hubfrete/services/entrega_service.dart';
+import 'package:hubfrete/services/route_service.dart';
+import 'package:hubfrete/theme.dart';
+import 'package:hubfrete/widgets/entrega_details_sheet.dart';
 
 /// Full-screen, interactive route map for an entrega.
 ///

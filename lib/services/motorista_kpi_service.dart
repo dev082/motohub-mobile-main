@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/entrega.dart';
-import 'package:motohub/models/motorista_kpi.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/entrega.dart';
+import 'package:hubfrete/models/motorista_kpi.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Service para gerenciar KPIs de motoristas
 class MotoristaKPIService {

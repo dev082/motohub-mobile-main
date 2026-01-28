@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:motohub/models/entrega.dart';
-import 'package:motohub/theme.dart';
+import 'package:hubfrete/models/entrega.dart';
+import 'package:hubfrete/theme.dart';
 import 'package:intl/intl.dart';
-import 'package:motohub/widgets/entrega_route_preview.dart';
+import 'package:hubfrete/widgets/entrega_route_preview.dart';
 
 /// Card component for displaying entrega information
 class EntregaCard extends StatelessWidget {

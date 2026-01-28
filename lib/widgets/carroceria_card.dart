@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:motohub/models/carroceria.dart';
-import 'package:motohub/theme.dart';
+import 'package:hubfrete/models/carroceria.dart';
+import 'package:hubfrete/theme.dart';
 
 /// Card widget to display trailer preview
 class CarroceriaCard extends StatelessWidget {

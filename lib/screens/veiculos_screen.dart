@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:motohub/models/carroceria.dart';
-import 'package:motohub/models/motorista.dart';
-import 'package:motohub/models/veiculo.dart';
-import 'package:motohub/nav.dart';
-import 'package:motohub/providers/app_provider.dart';
-import 'package:motohub/services/carroceria_service.dart';
-import 'package:motohub/services/veiculo_service.dart';
-import 'package:motohub/theme.dart';
-import 'package:motohub/widgets/app_drawer.dart';
-import 'package:motohub/widgets/veiculo_card.dart';
-import 'package:motohub/widgets/carroceria_card.dart';
-import 'package:motohub/widgets/pull_to_refresh.dart';
+import 'package:hubfrete/models/carroceria.dart';
+import 'package:hubfrete/models/motorista.dart';
+import 'package:hubfrete/models/veiculo.dart';
+import 'package:hubfrete/nav.dart';
+import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/services/carroceria_service.dart';
+import 'package:hubfrete/services/veiculo_service.dart';
+import 'package:hubfrete/theme.dart';
+import 'package:hubfrete/widgets/app_drawer.dart';
+import 'package:hubfrete/widgets/veiculo_card.dart';
+import 'package:hubfrete/widgets/carroceria_card.dart';
+import 'package:hubfrete/widgets/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
 
 /// Screen for managing vehicles and trailers

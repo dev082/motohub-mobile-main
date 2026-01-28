@@ -1,14 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:motohub/models/carga.dart';
-import 'package:motohub/providers/app_provider.dart';
-import 'package:motohub/services/carga_service.dart';
-import 'package:motohub/nav.dart';
-import 'package:motohub/theme.dart';
-import 'package:motohub/widgets/app_drawer.dart';
-import 'package:motohub/widgets/carga_card.dart';
-import 'package:motohub/widgets/pull_to_refresh.dart';
+import 'package:hubfrete/models/carga.dart';
+import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/services/carga_service.dart';
+import 'package:hubfrete/nav.dart';
+import 'package:hubfrete/theme.dart';
+import 'package:hubfrete/widgets/app_drawer.dart';
+import 'package:hubfrete/widgets/carga_card.dart';
+import 'package:hubfrete/widgets/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 

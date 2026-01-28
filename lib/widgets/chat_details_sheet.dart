@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:motohub/models/chat.dart';
-import 'package:motohub/models/entrega.dart';
-import 'package:motohub/nav.dart';
-import 'package:motohub/theme.dart';
+import 'package:hubfrete/models/chat.dart';
+import 'package:hubfrete/models/entrega.dart';
+import 'package:hubfrete/nav.dart';
+import 'package:hubfrete/theme.dart';
 
 /// Bottom sheet with details about the current chat + linked delivery/cargo.
 ///

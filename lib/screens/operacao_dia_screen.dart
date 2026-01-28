@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
-import 'package:motohub/models/entrega.dart';
-import 'package:motohub/models/documento_validacao.dart';
-import 'package:motohub/nav.dart';
-import 'package:motohub/providers/app_provider.dart';
-import 'package:motohub/services/entrega_service.dart';
-import 'package:motohub/services/documento_validacao_service.dart';
-import 'package:motohub/services/location_tracking_service.dart';
-import 'package:motohub/theme.dart';
-import 'package:motohub/widgets/app_drawer.dart';
+import 'package:hubfrete/models/entrega.dart';
+import 'package:hubfrete/models/documento_validacao.dart';
+import 'package:hubfrete/nav.dart';
+import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/services/entrega_service.dart';
+import 'package:hubfrete/services/documento_validacao_service.dart';
+import 'package:hubfrete/services/location_tracking_service.dart';
+import 'package:hubfrete/theme.dart';
+import 'package:hubfrete/widgets/app_drawer.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 

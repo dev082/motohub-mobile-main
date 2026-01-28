@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
-import 'package:motohub/supabase/secure_storage_adapter.dart';
+import 'package:hubfrete/supabase/secure_storage_adapter.dart';
 
 /// Generic Supabase configuration template
 /// Replace YOUR_ and YOUR_ with your actual values

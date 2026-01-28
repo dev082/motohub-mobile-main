@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/documento_validacao.dart';
-import 'package:motohub/services/notification_service.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/documento_validacao.dart';
+import 'package:hubfrete/services/notification_service.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Service para gerenciar documentos com validação de vencimento
 class DocumentoValidacaoService {

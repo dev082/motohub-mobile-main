@@ -1,11 +1,11 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/geofence.dart';
-import 'package:motohub/models/entrega_evento.dart';
-import 'package:motohub/services/entrega_evento_service.dart';
-import 'package:motohub/services/notification_service.dart';
-import 'package:motohub/services/entrega_service.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/geofence.dart';
+import 'package:hubfrete/models/entrega_evento.dart';
+import 'package:hubfrete/services/entrega_evento_service.dart';
+import 'package:hubfrete/services/notification_service.dart';
+import 'package:hubfrete/services/entrega_service.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Service para gerenciar geofences
 class GeofenceService {

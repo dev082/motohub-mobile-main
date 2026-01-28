@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/prova_entrega.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/prova_entrega.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Service para gerenciar Provas de Entrega (POD)
 class ProvaEntregaService {

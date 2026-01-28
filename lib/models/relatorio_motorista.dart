@@ -1,4 +1,4 @@
-import 'package:motohub/models/entrega.dart';
+import 'package:hubfrete/models/entrega.dart';
 
 /// Aggregated report data for a motorista.
 class RelatorioMotorista {

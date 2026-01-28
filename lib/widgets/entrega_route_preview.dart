@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:motohub/models/carga.dart';
-import 'package:motohub/services/route_service.dart';
-import 'package:motohub/theme.dart';
+import 'package:hubfrete/models/carga.dart';
+import 'package:hubfrete/services/route_service.dart';
+import 'package:hubfrete/theme.dart';
 
 /// Compact, non-interactive map preview for an entrega route (origem -> destino).
 ///

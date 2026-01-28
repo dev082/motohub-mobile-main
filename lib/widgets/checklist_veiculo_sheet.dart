@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:motohub/models/checklist_veiculo.dart';
-import 'package:motohub/services/storage_upload_service.dart';
-import 'package:motohub/providers/app_provider.dart';
+import 'package:hubfrete/models/checklist_veiculo.dart';
+import 'package:hubfrete/services/storage_upload_service.dart';
+import 'package:hubfrete/providers/app_provider.dart';
 import 'package:provider/provider.dart';
 
 /// Bottom sheet para preencher checklist do veículo antes de iniciar entrega

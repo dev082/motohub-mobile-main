@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/chat.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/chat.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for managing chat and messages

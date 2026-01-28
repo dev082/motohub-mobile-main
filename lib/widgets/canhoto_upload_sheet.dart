@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:motohub/theme.dart';
-import 'package:motohub/widgets/attachment_pickers.dart';
+import 'package:hubfrete/theme.dart';
+import 'package:hubfrete/widgets/attachment_pickers.dart';
 
 /// Bottom sheet to require the driver to attach the delivery receipt (canhoto)
 /// before marking the delivery as completed.

@@ -4,12 +4,12 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:motohub/models/entrega.dart';
-import 'package:motohub/models/relatorio_motorista.dart';
-import 'package:motohub/providers/app_provider.dart';
-import 'package:motohub/services/relatorio_service.dart';
-import 'package:motohub/theme.dart';
-import 'package:motohub/widgets/app_drawer.dart';
+import 'package:hubfrete/models/entrega.dart';
+import 'package:hubfrete/models/relatorio_motorista.dart';
+import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/services/relatorio_service.dart';
+import 'package:hubfrete/theme.dart';
+import 'package:hubfrete/widgets/app_drawer.dart';
 import 'package:provider/provider.dart';
 
 class RelatoriosScreen extends StatefulWidget {

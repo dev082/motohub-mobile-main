@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/carga.dart';
-import 'package:motohub/models/motorista.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/carga.dart';
+import 'package:hubfrete/models/motorista.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Service for managing cargas (freight loads)
 class CargaService {

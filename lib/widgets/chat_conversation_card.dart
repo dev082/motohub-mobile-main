@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:motohub/models/chat.dart';
-import 'package:motohub/models/entrega.dart';
-import 'package:motohub/supabase/supabase_config.dart';
-import 'package:motohub/theme.dart';
+import 'package:hubfrete/models/chat.dart';
+import 'package:hubfrete/models/entrega.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
+import 'package:hubfrete/theme.dart';
 
 /// Card reutilizável para itens de conversa (lista e histórico).
 ///

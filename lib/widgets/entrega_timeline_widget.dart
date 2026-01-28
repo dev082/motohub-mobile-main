@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:motohub/models/entrega_evento.dart';
+import 'package:hubfrete/models/entrega_evento.dart';
 import 'package:intl/intl.dart';
 
 /// Widget de timeline para exibir eventos de uma entrega

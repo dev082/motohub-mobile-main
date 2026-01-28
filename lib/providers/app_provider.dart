@@ -4,15 +4,15 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/motorista.dart';
-import 'package:motohub/services/auth_service.dart';
-import 'package:motohub/services/location_service.dart';
-import 'package:motohub/services/location_tracking_service.dart';
-import 'package:motohub/services/notification_service.dart';
-import 'package:motohub/services/entrega_service.dart';
-import 'package:motohub/services/secure_storage_service.dart';
-import 'package:motohub/services/storage_upload_service.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/motorista.dart';
+import 'package:hubfrete/services/auth_service.dart';
+import 'package:hubfrete/services/location_service.dart';
+import 'package:hubfrete/services/location_tracking_service.dart';
+import 'package:hubfrete/services/notification_service.dart';
+import 'package:hubfrete/services/entrega_service.dart';
+import 'package:hubfrete/services/secure_storage_service.dart';
+import 'package:hubfrete/services/storage_upload_service.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Main app provider for managing global state

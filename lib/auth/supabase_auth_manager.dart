@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:motohub/auth/auth_manager.dart';
-import 'package:motohub/models/user.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/auth/auth_manager.dart';
+import 'package:hubfrete/models/user.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 /// Supabase implementation of AuthManager with email/password authentication

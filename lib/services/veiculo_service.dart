@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/veiculo.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/veiculo.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Service for managing vehicle data
 class VeiculoService {

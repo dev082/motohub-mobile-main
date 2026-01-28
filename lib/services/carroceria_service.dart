@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/carroceria.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/carroceria.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Service for managing trailer data
 class CarroceriaService {

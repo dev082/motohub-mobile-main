@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:motohub/models/entrega.dart';
-import 'package:motohub/models/entrega_evento.dart';
-import 'package:motohub/models/prova_entrega.dart';
-import 'package:motohub/services/entrega_service.dart';
-import 'package:motohub/services/entrega_evento_service.dart';
-import 'package:motohub/services/prova_entrega_service.dart';
-import 'package:motohub/widgets/attachment_pickers.dart';
-import 'package:motohub/widgets/canhoto_upload_sheet.dart';
-import 'package:motohub/widgets/checklist_veiculo_sheet.dart';
-import 'package:motohub/widgets/entrega_timeline_widget.dart';
+import 'package:hubfrete/models/entrega.dart';
+import 'package:hubfrete/models/entrega_evento.dart';
+import 'package:hubfrete/models/prova_entrega.dart';
+import 'package:hubfrete/services/entrega_service.dart';
+import 'package:hubfrete/services/entrega_evento_service.dart';
+import 'package:hubfrete/services/prova_entrega_service.dart';
+import 'package:hubfrete/widgets/attachment_pickers.dart';
+import 'package:hubfrete/widgets/canhoto_upload_sheet.dart';
+import 'package:hubfrete/widgets/checklist_veiculo_sheet.dart';
+import 'package:hubfrete/widgets/entrega_timeline_widget.dart';
 
 /// Tela de detalhes da entrega com timeline, POD e ações
 class EntregaDetalhesScreen extends StatefulWidget {

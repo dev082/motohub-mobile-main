@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
-import 'package:motohub/models/veiculo.dart';
-import 'package:motohub/providers/app_provider.dart';
-import 'package:motohub/services/storage_upload_service.dart';
-import 'package:motohub/services/veiculo_service.dart';
-import 'package:motohub/theme.dart';
-import 'package:motohub/widgets/attachment_pickers.dart';
+import 'package:hubfrete/models/veiculo.dart';
+import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/services/storage_upload_service.dart';
+import 'package:hubfrete/services/veiculo_service.dart';
+import 'package:hubfrete/theme.dart';
+import 'package:hubfrete/widgets/attachment_pickers.dart';
 import 'package:provider/provider.dart';
 
 /// Screen for creating/editing a vehicle

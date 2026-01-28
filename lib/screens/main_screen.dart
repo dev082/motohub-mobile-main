@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:motohub/nav.dart';
-import 'package:motohub/screens/operacao_dia_screen.dart';
-import 'package:motohub/screens/entregas_screen.dart';
-import 'package:motohub/screens/chat_list_screen.dart';
-import 'package:motohub/widgets/tracking_permission_sheet.dart';
+import 'package:hubfrete/nav.dart';
+import 'package:hubfrete/screens/operacao_dia_screen.dart';
+import 'package:hubfrete/screens/entregas_screen.dart';
+import 'package:hubfrete/screens/chat_list_screen.dart';
+import 'package:hubfrete/widgets/tracking_permission_sheet.dart';
 
 /// Main screen with bottom navigation
 class MainScreen extends StatefulWidget {

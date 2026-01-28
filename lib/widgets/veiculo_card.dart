@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:motohub/models/veiculo.dart';
-import 'package:motohub/theme.dart';
+import 'package:hubfrete/models/veiculo.dart';
+import 'package:hubfrete/theme.dart';
 
 /// Card widget to display vehicle preview
 class VeiculoCard extends StatelessWidget {

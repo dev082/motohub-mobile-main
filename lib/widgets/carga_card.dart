@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:motohub/models/carga.dart';
-import 'package:motohub/theme.dart';
+import 'package:hubfrete/models/carga.dart';
+import 'package:hubfrete/theme.dart';
 import 'package:intl/intl.dart';
 
 /// Card component for displaying carga information

@@ -2,7 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:motohub/theme.dart';
+import 'package:hubfrete/theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Preview de anexo para mensagens do chat.

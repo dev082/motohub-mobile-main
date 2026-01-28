@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:motohub/theme.dart';
+import 'package:hubfrete/theme.dart';
 
 /// Collapsible section used in the chat list (e.g. "AGUARDANDO COLETA").
 class ChatSection extends StatelessWidget {

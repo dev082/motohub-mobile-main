@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:motohub/models/chat.dart';
-import 'package:motohub/models/entrega.dart';
-import 'package:motohub/providers/app_provider.dart';
-import 'package:motohub/services/chat_service.dart';
-import 'package:motohub/services/entrega_service.dart';
-import 'package:motohub/theme.dart';
-import 'package:motohub/widgets/chat_conversation_card.dart';
+import 'package:hubfrete/models/chat.dart';
+import 'package:hubfrete/models/entrega.dart';
+import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/services/chat_service.dart';
+import 'package:hubfrete/services/entrega_service.dart';
+import 'package:hubfrete/theme.dart';
+import 'package:hubfrete/widgets/chat_conversation_card.dart';
 import 'package:provider/provider.dart';
 
 /// Chat history screen - shows chats for delivered/cancelled deliveries (read-only)

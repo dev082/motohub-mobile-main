@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:motohub/providers/app_provider.dart';
-import 'package:motohub/theme.dart';
-import 'package:motohub/widgets/app_drawer.dart';
-import 'package:motohub/widgets/pull_to_refresh.dart';
+import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/theme.dart';
+import 'package:hubfrete/widgets/app_drawer.dart';
+import 'package:hubfrete/widgets/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
 
 /// Profile screen - shows motorista information

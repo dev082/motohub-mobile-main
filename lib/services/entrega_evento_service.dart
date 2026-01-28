@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:motohub/models/entrega_evento.dart';
-import 'package:motohub/services/notification_service.dart';
-import 'package:motohub/supabase/supabase_config.dart';
+import 'package:hubfrete/models/entrega_evento.dart';
+import 'package:hubfrete/services/notification_service.dart';
+import 'package:hubfrete/supabase/supabase_config.dart';
 
 /// Service para gerenciar eventos de entrega (timeline + auditoria)
 class EntregaEventoService {
