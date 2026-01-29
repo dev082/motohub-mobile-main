@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hubfrete/models/carga.dart';
 import 'package:hubfrete/models/entrega.dart';
 import 'package:hubfrete/models/documento_validacao.dart';
 import 'package:hubfrete/nav.dart';
 import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/services/carga_service.dart';
 import 'package:hubfrete/services/entrega_service.dart';
 import 'package:hubfrete/services/documento_validacao_service.dart';
 import 'package:hubfrete/theme.dart';
@@ -22,12 +24,13 @@ class OperacaoDiaScreen extends StatefulWidget {
 class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
   final _entregaService = EntregaService();
   final _documentoService = DocumentoValidacaoService();
+  final _cargaService = CargaService();
 
   static const double _saldoMock = 0.79;
 
-  Entrega? _entregaAtual;
-  List<Entrega> _proximasEntregas = [];
+  List<Entrega> _entregasAtuais = [];
   List<DocumentoValidacao> _documentosAlerta = [];
+  List<Carga> _cargasProximas = [];
   bool _isLoading = true;
 
   @override
@@ -51,13 +54,23 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
       final entregas = await _entregaService.getMotoristaEntregas(motoristaId, activeOnly: true);
       final docs = await _documentoService.getDocumentosComAlerta(motoristaId: motoristaId);
 
-      setState(() {
-        if (entregas.isNotEmpty) {
-          _entregaAtual = entregas.first;
-          _proximasEntregas = entregas.skip(1).take(3).toList();
+      // “Cargas próximas”: por enquanto usamos as cargas disponíveis no backend.
+      // No futuro podemos filtrar/ordenar por distância usando a localização atual.
+      List<Carga> cargas = [];
+      try {
+        final motorista = appProvider.currentMotorista;
+        if (motorista != null) {
+          cargas = await _cargaService.getAvailableCargas(motorista);
         }
+      } catch (e) {
+        debugPrint('Falha ao carregar cargas disponíveis (Início): $e');
+      }
+
+      setState(() {
+        _entregasAtuais = entregas.take(8).toList();
         _documentosAlerta = docs.where((d) =>
             d.status == StatusDocumento.vence7Dias || d.status == StatusDocumento.vencido).toList();
+        _cargasProximas = cargas.take(6).toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -97,19 +110,18 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
                   else ...[
                     if (_documentosAlerta.isNotEmpty) _buildAlertasDocumentos(),
                     const SizedBox(height: AppSpacing.lg),
-                    const InicioSectionHeader(title: 'Vistos recentemente', trailing: 'Ver todos'),
+                    InicioSectionHeader(
+                      title: 'Cargas próximas',
+                      trailing: 'Ver mais',
+                      onTrailingTap: () => context.go('${AppRoutes.home}?tab=explorar'),
+                    ),
                     const SizedBox(height: AppSpacing.sm),
-                    InicioRecentCard(entregaAtual: _entregaAtual),
+                    InicioCargasProximasCard(
+                      cargas: _cargasProximas,
+                      onTapExplorar: () => context.go('${AppRoutes.home}?tab=explorar'),
+                    ),
                     const SizedBox(height: AppSpacing.lg),
-                    if (_entregaAtual != null) ...[
-                      _buildEntregaAtual(),
-                      const SizedBox(height: AppSpacing.lg),
-                    ] else
-                      _buildSemEntregasAtivas(),
-                    if (_proximasEntregas.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.lg),
-                      _buildProximasEntregas(),
-                    ],
+                    _buildEntregasAtuais(),
                     const SizedBox(height: AppSpacing.lg),
                     _buildAtalhos(),
                   ],
@@ -162,67 +174,60 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
     );
   }
 
-  Widget _buildEntregaAtual() {
-    final entrega = _entregaAtual!;
-    final carga = entrega.carga;
+  Widget _buildEntregasAtuais() {
+    final theme = Theme.of(context);
+    final hasEntregas = _entregasAtuais.isNotEmpty;
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.sm),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.local_shipping, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text('Entrega Atual', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                const Spacer(),
-                Chip(
-                  label: Text(entrega.status.displayName, style: Theme.of(context).textTheme.labelSmall),
-                  padding: EdgeInsets.zero,
-                ),
-              ],
-            ),
-            const Divider(height: 24),
-            if (carga != null) ...[
-              _buildInfoRow(Icons.inventory, 'Carga', carga.descricao),
-              const SizedBox(height: 8),
-              _buildInfoRow(Icons.location_on, 'Destino', carga.destino?.cidade ?? 'N/A'),
-              const SizedBox(height: 8),
-              _buildInfoRow(Icons.scale, 'Peso', '${entrega.pesoAlocadoKg?.toStringAsFixed(0) ?? '0'} kg'),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              children: [
+                Icon(Icons.local_shipping_outlined, color: theme.colorScheme.onSurface),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => context.push(AppRoutes.entregaMapaPath(entrega.id)),
-                    icon: const Icon(Icons.map),
-                    label: const Text('Ver Rota'),
-                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                  child: Text(
+                    'Entregas atuais',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => context.push(AppRoutes.chatPath(entrega.id)),
-                    icon: const Icon(Icons.chat),
-                    label: const Text('Chat'),
-                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                TextButton(
+                  onPressed: () => context.go('${AppRoutes.home}?tab=entregas'),
+                  child: Text(
+                    'Ver entregas',
+                    style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: carga == null ? null : () => _openMapsParaEntrega(entrega),
-                icon: const Icon(Icons.directions),
-                label: const Text('Abrir no Maps'),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+            const SizedBox(height: AppSpacing.sm),
+            if (!hasEntregas)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: Text(
+                  'Você não tem entregas em andamento no momento.',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              )
+            else
+              SizedBox(
+                height: 168,
+                child: ListView.separated(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _entregasAtuais.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                  itemBuilder: (context, index) {
+                    final e = _entregasAtuais[index];
+                    return InicioEntregaCompactTile(
+                      entrega: e,
+                      onTap: () => context.go('${AppRoutes.home}?tab=entregas'),
+                    );
+                  },
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -299,41 +304,18 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
             Text('Nenhuma entrega ativa', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Text(
-              'Você está livre para aceitar novas cargas',
+              'Quando você tiver uma entrega ativa, ela aparece aqui.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () => context.go('${AppRoutes.home}?tab=explorar'),
               icon: const Icon(Icons.search),
-              label: const Text('Explorar cargas'),
+              label: const Text('Explorar'),
             )
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildProximasEntregas() {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Próximas Entregas', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        ..._proximasEntregas.map((e) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: Icon(Icons.local_shipping_outlined, color: theme.colorScheme.primary),
-                title: Text(e.carga?.descricao ?? 'Carga', maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text(e.status.displayName),
-                trailing: Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
-                onTap: () => context.push(AppRoutes.entregaMapaPath(e.id)),
-                tileColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-              ),
-            )),
-      ],
     );
   }
 
@@ -583,9 +565,9 @@ class InicioTopHeader extends StatelessWidget {
                           child: Row(
                             children: [
                               Expanded(
-                                child: Text('Disponível para fretes', style: theme.textTheme.bodyMedium?.copyWith(color: onBg)),
+                                child: Text('Localização ativa', style: theme.textTheme.bodyMedium?.copyWith(color: onBg)),
                               ),
-                              Text('Expira em 24h', style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                              Text('Atualizando', style: theme.textTheme.bodySmall?.copyWith(color: muted)),
                             ],
                           ),
                         ),
@@ -625,12 +607,14 @@ class InicioTopHeader extends StatelessWidget {
 }
 
 class InicioSearchCard extends StatelessWidget {
-  const InicioSearchCard({super.key, required this.onTap});
+  const InicioSearchCard({super.key, required this.onTap, this.origemLabel});
   final VoidCallback onTap;
+  final String? origemLabel;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final label = (origemLabel == null || origemLabel!.trim().isEmpty) ? 'sua localização' : origemLabel!.trim();
     return Material(
       color: theme.colorScheme.surface,
       borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -649,7 +633,7 @@ class InicioSearchCard extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
-                  'Origem: Marília, SP',
+                  'Origem: $label',
                   style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -664,9 +648,10 @@ class InicioSearchCard extends StatelessWidget {
 }
 
 class InicioSectionHeader extends StatelessWidget {
-  const InicioSectionHeader({super.key, required this.title, this.trailing});
+  const InicioSectionHeader({super.key, required this.title, this.trailing, this.onTrailingTap});
   final String title;
   final String? trailing;
+  final VoidCallback? onTrailingTap;
 
   @override
   Widget build(BuildContext context) {
@@ -676,7 +661,7 @@ class InicioSectionHeader extends StatelessWidget {
         Expanded(child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
         if (trailing != null)
           TextButton(
-            onPressed: () {},
+            onPressed: onTrailingTap,
             child: Text(trailing!, style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
           ),
       ],
@@ -684,48 +669,163 @@ class InicioSectionHeader extends StatelessWidget {
   }
 }
 
-class InicioRecentCard extends StatelessWidget {
-  const InicioRecentCard({super.key, required this.entregaAtual});
-  final Entrega? entregaAtual;
+class InicioCargasProximasCard extends StatelessWidget {
+  const InicioCargasProximasCard({
+    super.key,
+    required this.cargas,
+    required this.onTapExplorar,
+  });
+
+  final List<Carga> cargas;
+  final VoidCallback onTapExplorar;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final carga = entregaAtual?.carga;
-    final origem = carga?.origem?.cidade;
-    final ufOrigem = carga?.origem?.estado;
-    final destino = carga?.destino?.cidade;
-    final ufDestino = carga?.destino?.estado;
-
-    final route = (origem != null && destino != null)
-        ? '${origem}${ufOrigem != null ? ', $ufOrigem' : ''}  →  ${destino}${ufDestino != null ? ', $ufDestino' : ''}'
-        : 'Bauru, SP  →  Uberlândia, MG';
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(child: Text(route, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800))),
-                Text('DIVERSOS', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w700)),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              children: [
-                Text('R\$ 1.800,00', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: () {},
-                  icon: Icon(Icons.arrow_forward, size: 18, color: theme.colorScheme.primary),
-                  label: Text('Ver', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w800)),
+    if (cargas.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Sem cargas para mostrar agora. Tente explorar.',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
-              ],
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              FilledButton(
+                onPressed: onTapExplorar,
+                child: const Text('Explorar'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 132,
+      child: ListView.separated(
+        physics: const BouncingScrollPhysics(),
+        scrollDirection: Axis.horizontal,
+        itemCount: cargas.length,
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+        itemBuilder: (context, index) {
+          final c = cargas[index];
+          final origem = c.origem != null ? '${c.origem!.cidade}, ${c.origem!.estado}' : 'Origem';
+          final destino = c.destino != null ? '${c.destino!.cidade}, ${c.destino!.estado}' : 'Destino';
+
+          return SizedBox(
+            width: 260,
+            child: Card(
+              child: InkWell(
+                onTap: onTapExplorar,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${origem.split(',').first} → ${destino.split(',').first}',
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        c.descricao,
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          Icon(Icons.near_me_outlined, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              origem,
+                              style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w700),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class InicioEntregaCompactTile extends StatelessWidget {
+  const InicioEntregaCompactTile({super.key, required this.entrega, required this.onTap});
+
+  final Entrega entrega;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final carga = entrega.carga;
+    final destino = carga?.destino != null ? '${carga!.destino!.cidade}, ${carga.destino!.estado}' : 'Destino não informado';
+    final title = carga?.descricao ?? 'Entrega';
+
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.14)),
+                ),
+                child: Icon(Icons.local_shipping_outlined, color: theme.colorScheme.onSurface),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(destino, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                entrega.status.displayName,
+                style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w700),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );
