@@ -78,6 +78,13 @@ class EntregaCard extends StatelessWidget {
     final action = _nextStageAction();
     final cs = Theme.of(context).colorScheme;
     return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        side: BorderSide(
+          color: isSelected ? cs.primary.withValues(alpha: 0.35) : cs.outline.withValues(alpha: 0.14),
+          width: 1,
+        ),
+      ),
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       child: InkWell(
         onTap: onTap,
@@ -108,34 +115,12 @@ class EntregaCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  if (_isActiveEntrega)
-                    _ActiveEntregaToggle(
-                      isSelected: isSelected,
-                      onPressed: onSelect,
-                    ),
-                  if (_isActiveEntrega) const SizedBox(width: AppSpacing.xs),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor().withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                    child: Text(
-                      entrega.status.displayName,
-                      style: context.textStyles.labelSmall?.copyWith(
-                        color: _getStatusColor(),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
                   _EntregaCardMenu(
                     onViewMap: onViewMap,
                     onViewDetails: onViewDetails ?? onTap,
                     onSendMessage: onSendMessage,
+                    onSelect: _isActiveEntrega ? onSelect : null,
+                    isSelected: isSelected,
                     iconColor: cs.onSurfaceVariant,
                   ),
                 ],
@@ -149,6 +134,25 @@ class EntregaCard extends StatelessWidget {
                   style: context.textStyles.bodyMedium,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _StatusChip(
+                    label: entrega.status.displayName,
+                    color: _getStatusColor(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+
+              if (entrega.carga == null) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _StatusChip(
+                    label: entrega.status.displayName,
+                    color: _getStatusColor(),
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
               ],
@@ -288,74 +292,51 @@ class EntregaCard extends StatelessWidget {
   }
 }
 
-class _ActiveEntregaToggle extends StatelessWidget {
-  const _ActiveEntregaToggle({required this.isSelected, this.onPressed});
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.label, required this.color});
 
-  final bool isSelected;
-  final VoidCallback? onPressed;
+  final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final enabled = !isSelected && onPressed != null;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
       decoration: BoxDecoration(
-        color: isSelected ? cs.primaryContainer : cs.surfaceContainerHighest,
+        color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: isSelected ? cs.primary.withValues(alpha: 0.35) : cs.outline.withValues(alpha: 0.18),
-          width: 1,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.18), width: 1),
       ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: enabled ? onPressed : null,
-          borderRadius: BorderRadius.circular(999),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-                  size: 16,
-                  color: isSelected ? cs.primary : cs.onSurfaceVariant,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Text(
-                  isSelected ? 'Selecionada' : 'Selecionar',
-                  style: context.textStyles.labelSmall?.copyWith(color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant, fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-          ),
-        ),
+      child: Text(
+        label,
+        style: context.textStyles.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w700),
       ),
     );
   }
 }
 
-enum _EntregaCardMenuAction { viewMap, viewDetails, sendMessage }
+enum _EntregaCardMenuAction { select, viewMap, viewDetails, sendMessage }
 
 class _EntregaCardMenu extends StatelessWidget {
   const _EntregaCardMenu({
     required this.onViewMap,
     required this.onViewDetails,
     required this.onSendMessage,
+    required this.onSelect,
+    required this.isSelected,
     required this.iconColor,
   });
 
   final VoidCallback? onViewMap;
   final VoidCallback? onViewDetails;
   final VoidCallback? onSendMessage;
+  final VoidCallback? onSelect;
+  final bool isSelected;
   final Color iconColor;
 
   @override
   Widget build(BuildContext context) {
-    final hasAny = onViewMap != null || onViewDetails != null || onSendMessage != null;
+    final hasAny = onSelect != null || onViewMap != null || onViewDetails != null || onSendMessage != null;
     if (!hasAny) {
       return Icon(Icons.more_vert, size: 20, color: iconColor.withValues(alpha: 0.35));
     }
@@ -364,6 +345,18 @@ class _EntregaCardMenu extends StatelessWidget {
       tooltip: 'Mais opções',
       icon: Icon(Icons.more_vert, size: 20, color: iconColor),
       itemBuilder: (context) => [
+        if (onSelect != null)
+          PopupMenuItem(
+            value: _EntregaCardMenuAction.select,
+            enabled: !isSelected,
+            child: Row(
+              children: [
+                Icon(isSelected ? Icons.check_circle : Icons.check_circle_outline, size: 18, color: iconColor),
+                const SizedBox(width: AppSpacing.sm),
+                Text(isSelected ? 'Entrega selecionada' : 'Selecionar entrega'),
+              ],
+            ),
+          ),
         if (onViewMap != null)
           PopupMenuItem(
             value: _EntregaCardMenuAction.viewMap,
@@ -382,6 +375,9 @@ class _EntregaCardMenu extends StatelessWidget {
       ],
       onSelected: (action) {
         switch (action) {
+          case _EntregaCardMenuAction.select:
+            if (!isSelected) onSelect?.call();
+            break;
           case _EntregaCardMenuAction.viewMap:
             onViewMap?.call();
             break;
