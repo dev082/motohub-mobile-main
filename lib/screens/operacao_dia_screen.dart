@@ -58,13 +58,13 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
   Future<void> _loadOrigemFromLocation() async {
     try {
       final permission = await Geolocator.checkPermission();
-      final hasPermission = permission == LocationPermission.always || permission == LocationPermission.whileInUse;
+      final hasPermission = permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse;
       if (!hasPermission) return;
 
-      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.low);
+      final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.low);
 
-      // Reverse geocode simples via Nominatim (OpenStreetMap).
-      // Obs: em produção, considere cache + rate limiting mais forte.
       final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
         'format': 'jsonv2',
         'lat': position.latitude.toStringAsFixed(6),
@@ -79,7 +79,8 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
       }).timeout(const Duration(seconds: 6));
 
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
-        debugPrint('OperacaoDiaScreen: reverse geocode failed status=${resp.statusCode}');
+        debugPrint(
+            'OperacaoDiaScreen: reverse geocode failed status=${resp.statusCode}');
         return;
       }
 
@@ -88,14 +89,21 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
       final address = decoded['address'];
       if (address is! Map) return;
 
-      final city = (address['city'] ?? address['town'] ?? address['village'] ?? address['municipality'])?.toString();
+      final city = (address['city'] ??
+              address['town'] ??
+              address['village'] ??
+              address['municipality'])
+          ?.toString();
       final state = (address['state_code'] ?? address['state'])?.toString();
-      final label = [city, state].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
+      final label = [city, state]
+          .where((v) => v != null && v.toString().trim().isNotEmpty)
+          .join(', ');
       if (!mounted) return;
       if (label.trim().isEmpty) return;
       setState(() => _origemLabel = label.trim());
     } catch (e) {
-      debugPrint('OperacaoDiaScreen: failed to load origin label from location: $e');
+      debugPrint(
+          'OperacaoDiaScreen: failed to load origin label from location: $e');
     }
   }
 
@@ -105,7 +113,6 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
   }
 
   void _openFinanceiro() {
-    // Ainda não existe a aba Financeiro. Mantemos um placeholder amigável.
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Financeiro em breve.')),
     );
@@ -118,11 +125,11 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
       final motoristaId = appProvider.currentMotorista?.id;
       if (motoristaId == null) return;
 
-      final entregas = await _entregaService.getMotoristaEntregas(motoristaId, activeOnly: true);
-      final docs = await _documentoService.getDocumentosComAlerta(motoristaId: motoristaId);
+      final entregas = await _entregaService.getMotoristaEntregas(motoristaId,
+          activeOnly: true);
+      final docs = await _documentoService.getDocumentosComAlerta(
+          motoristaId: motoristaId);
 
-      // “Cargas próximas”: por enquanto usamos as cargas disponíveis no backend.
-      // No futuro podemos filtrar/ordenar por distância usando a localização atual.
       List<Carga> cargas = [];
       try {
         final motorista = appProvider.currentMotorista;
@@ -135,8 +142,11 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
 
       setState(() {
         _entregasAtuais = entregas.take(8).toList();
-        _documentosAlerta = docs.where((d) =>
-            d.status == StatusDocumento.vence7Dias || d.status == StatusDocumento.vencido).toList();
+        _documentosAlerta = docs
+            .where((d) =>
+                d.status == StatusDocumento.vence7Dias ||
+                d.status == StatusDocumento.vencido)
+            .toList();
         _cargasProximas = cargas.take(6).toList();
         _isLoading = false;
       });
@@ -151,6 +161,10 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
     final appProvider = context.watch<AppProvider>();
     final motorista = appProvider.currentMotorista;
 
+    // Verifica se devemos aplicar o ajuste de "puxar para cima"
+    // Só puxamos se NÃO houver alertas de documentos, para colar o input nas cargas.
+    final bool shouldPullUp = !_isLoading && _documentosAlerta.isEmpty;
+
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _loadDados,
@@ -163,9 +177,11 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
                 motoristaFotoUrl: motorista?.fotoUrl,
                 saldo: _saldoMock,
                 isSaldoVisible: _isSaldoVisible,
-                onToggleSaldoVisibility: () => setState(() => _isSaldoVisible = !_isSaldoVisible),
+                onToggleSaldoVisibility: () =>
+                    setState(() => _isSaldoVisible = !_isSaldoVisible),
                 onTapCarteira: _openFinanceiro,
-                onTapExplorar: () => context.go('${AppRoutes.home}?tab=explorar'),
+                onTapExplorar: () =>
+                    context.go('${AppRoutes.home}?tab=explorar'),
                 searchController: _searchController,
                 origemLabel: _origemLabel,
                 onSearchSubmitted: _goToExplorarWithQuery,
@@ -174,27 +190,47 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
             SliverPadding(
               padding: EdgeInsets.fromLTRB(
                 AppSpacing.md,
-                AppSpacing.sm,
+                0,
                 AppSpacing.md,
                 AppSpacing.lg + MediaQuery.paddingOf(context).bottom,
               ),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  if (!_isLoading && _documentosAlerta.isNotEmpty) _buildAlertasDocumentos(),
-                  const SizedBox(height: AppSpacing.md),
-                  InicioSectionHeader(
-                    title: 'Cargas próximas',
-                    trailing: 'Ver mais',
-                    onTrailingTap: () => context.go('${AppRoutes.home}?tab=explorar'),
+                  // --- CORREÇÃO 1: Agrupamento condicional ---
+                  // O SizedBox só aparece se o alerta aparecer.
+                  if (!_isLoading && _documentosAlerta.isNotEmpty) ...[
+                    _buildAlertasDocumentos(),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+
+                  // --- CORREÇÃO 2: Ajuste visual ---
+                  // Se não tem alertas, puxamos este bloco para cima para cobrir o buraco do Header
+                  Transform.translate(
+                    offset: Offset(0, shouldPullUp ? -AppSpacing.md : 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        InicioSectionHeader(
+                          title: 'Cargas próximas',
+                          trailing: 'Ver mais',
+                          onTrailingTap: () =>
+                              context.go('${AppRoutes.home}?tab=explorar'),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        InicioCargasProximasCard(
+                          cargas: _cargasProximas,
+                          isLoading: _isLoading,
+                          onTapExplorar: () =>
+                              context.go('${AppRoutes.home}?tab=explorar'),
+                          onTapCarga: (carga) => context
+                              .push(AppRoutes.cargaDetailsPath(carga.id)),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  InicioCargasProximasCard(
-                    cargas: _cargasProximas,
-                    isLoading: _isLoading,
-                    onTapExplorar: () => context.go('${AppRoutes.home}?tab=explorar'),
-                    onTapCarga: (carga) => context.push(AppRoutes.cargaDetailsPath(carga.id)),
-                  ),
+
                   const SizedBox(height: AppSpacing.lg),
+
                   if (_isLoading)
                     const Padding(
                       padding: EdgeInsets.only(top: AppSpacing.sm),
@@ -260,25 +296,29 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.sm),
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.sm),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.local_shipping_outlined, color: theme.colorScheme.onSurface),
+                Icon(Icons.local_shipping_outlined,
+                    color: theme.colorScheme.onSurface),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
                     'Entregas atuais',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
                 TextButton(
                   onPressed: () => context.go('${AppRoutes.home}?tab=entregas'),
                   child: Text(
                     'Ver entregas',
-                    style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+                    style: theme.textTheme.labelLarge
+                        ?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
               ],
@@ -289,7 +329,8 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
                 padding: const EdgeInsets.only(bottom: AppSpacing.md),
                 child: Text(
                   'Você não tem entregas em andamento no momento.',
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               )
             else
@@ -300,7 +341,8 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: InicioEntregaCompactTile(
                         entrega: e,
-                        onTap: () => context.go('${AppRoutes.home}?tab=entregas'),
+                        onTap: () =>
+                            context.go('${AppRoutes.home}?tab=entregas'),
                       ),
                     ),
                 ],
@@ -319,20 +361,22 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
     if (origem == null || destino == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Origem/destino não encontrados para abrir no Maps.')),
+        const SnackBar(
+            content:
+                Text('Origem/destino não encontrados para abrir no Maps.')),
       );
       return;
     }
 
-    String formatPoint({required double? lat, required double? lng, required String fallback}) {
-      if (lat != null && lng != null) return '${lat.toStringAsFixed(6)},${lng.toStringAsFixed(6)}';
+    String formatPoint(
+        {required double? lat,
+        required double? lng,
+        required String fallback}) {
+      if (lat != null && lng != null)
+        return '${lat.toStringAsFixed(6)},${lng.toStringAsFixed(6)}';
       return fallback;
     }
 
-    // Objetivo: usuário segue rota com 2 pernas:
-    // 1) localização atual -> origem
-    // 2) origem -> destino
-    // No Google Maps isso funciona bem com: waypoints=origem e destination=destino.
     final origemText = formatPoint(
       lat: origem.latitude,
       lng: origem.longitude,
@@ -376,13 +420,18 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Icon(Icons.check_circle_outline, size: 64, color: theme.colorScheme.onSurfaceVariant),
+            Icon(Icons.check_circle_outline,
+                size: 64, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
-            Text('Nenhuma entrega ativa', style: Theme.of(context).textTheme.titleMedium),
+            Text('Nenhuma entrega ativa',
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Text(
               'Quando você tiver uma entrega ativa, ela aparece aqui.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
@@ -400,21 +449,33 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Atalhos', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        Text('Atalhos',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _buildAtalhoCard(Icons.directions_car, 'Veículos', () => context.go(AppRoutes.veiculos))),
+            Expanded(
+                child: _buildAtalhoCard(Icons.directions_car, 'Veículos',
+                    () => context.go(AppRoutes.veiculos))),
             const SizedBox(width: 8),
-            Expanded(child: _buildAtalhoCard(Icons.description, 'Documentos', _showDocumentosBottomSheet)),
+            Expanded(
+                child: _buildAtalhoCard(Icons.description, 'Documentos',
+                    _showDocumentosBottomSheet)),
           ],
         ),
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(child: _buildAtalhoCard(Icons.insights, 'Relatórios', () => context.go(AppRoutes.relatorios))),
+            Expanded(
+                child: _buildAtalhoCard(Icons.insights, 'Relatórios',
+                    () => context.go(AppRoutes.relatorios))),
             const SizedBox(width: 8),
-            Expanded(child: _buildAtalhoCard(Icons.chat_bubble, 'Chat', () => context.go('${AppRoutes.home}?tab=chat'))),
+            Expanded(
+                child: _buildAtalhoCard(Icons.chat_bubble, 'Chat',
+                    () => context.go('${AppRoutes.home}?tab=chat'))),
           ],
         ),
       ],
@@ -423,7 +484,8 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
 
   void _showDocumentosBottomSheet() {
     if (_documentosAlerta.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sem alertas de documentos.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sem alertas de documentos.')));
       return;
     }
 
@@ -440,7 +502,9 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Documentos em alerta', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text('Documentos em alerta',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 280,
@@ -452,13 +516,18 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
                       final isVencido = d.status == StatusDocumento.vencido;
                       return Container(
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+                          color: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.55),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         padding: const EdgeInsets.all(12),
                         child: Row(
                           children: [
-                            Icon(isVencido ? Icons.error_outline : Icons.warning_amber, color: theme.colorScheme.onSurfaceVariant),
+                            Icon(
+                                isVencido
+                                    ? Icons.error_outline
+                                    : Icons.warning_amber,
+                                color: theme.colorScheme.onSurfaceVariant),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -466,14 +535,17 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
                                 children: [
                                   Text(
                                     d.tipo.displayName,
-                                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                                    style: theme.textTheme.bodyMedium
+                                        ?.copyWith(fontWeight: FontWeight.w700),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     'Nº ${d.numero} • ${isVencido ? 'Vencido' : 'Próximo do vencimento'}',
-                                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -512,7 +584,8 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
           padding: const EdgeInsets.symmetric(vertical: 20),
           child: Column(
             children: [
-              Icon(icon, size: 32, color: Theme.of(context).colorScheme.primary),
+              Icon(icon,
+                  size: 32, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 8),
               Text(label, style: Theme.of(context).textTheme.bodySmall),
             ],
@@ -528,13 +601,17 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
       children: [
         Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
         const SizedBox(width: 8),
-        Text('$label: ', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-        Expanded(child: Text(value, style: theme.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
+        Text('$label: ',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(fontWeight: FontWeight.w600)),
+        Expanded(
+            child: Text(value,
+                style: theme.textTheme.bodySmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis)),
       ],
     );
   }
-
-  // _toggleTracking removido.
 }
 
 class InicioTopHeader extends StatelessWidget {
@@ -568,12 +645,16 @@ class InicioTopHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final bg = isDark ? DarkModeColors.darkHeader : LightModeColors.lightHeader;
-    final onBg = isDark ? DarkModeColors.darkOnHeader : LightModeColors.lightOnHeader;
-    final muted = isDark ? DarkModeColors.darkHeaderMuted : LightModeColors.lightHeaderMuted;
+    final onBg =
+        isDark ? DarkModeColors.darkOnHeader : LightModeColors.lightOnHeader;
+    final muted = isDark
+        ? DarkModeColors.darkHeaderMuted
+        : LightModeColors.lightHeaderMuted;
 
-    final displayName = (motoristaNome?.trim().isNotEmpty ?? false) ? motoristaNome!.trim() : 'Motorista';
+    final displayName = (motoristaNome?.trim().isNotEmpty ?? false)
+        ? motoristaNome!.trim()
+        : 'Motorista';
 
-    // Estrutura em Column (ao invés de altura fixa) para evitar overflow em telas menores.
     return Column(
       children: [
         Container(
@@ -581,7 +662,8 @@ class InicioTopHeader extends StatelessWidget {
           child: SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.md),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -593,21 +675,32 @@ class InicioTopHeader extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(displayName, style: theme.textTheme.titleMedium?.copyWith(color: onBg, fontWeight: FontWeight.w700)),
+                            Text(displayName,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                    color: onBg, fontWeight: FontWeight.w700)),
                             const SizedBox(height: 2),
                             Row(
                               children: [
-                                Icon(Icons.verified_outlined, size: 16, color: muted),
+                                Icon(Icons.verified_outlined,
+                                    size: 16, color: muted),
                                 const SizedBox(width: 6),
-                                Text('Motorista VIP', style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                                Text('Motorista VIP',
+                                    style: theme.textTheme.bodySmall
+                                        ?.copyWith(color: muted)),
                               ],
                             ),
                           ],
                         ),
                       ),
-                      _HeaderIconButton(icon: Icons.group_outlined, color: onBg, onPressed: () {}),
+                      _HeaderIconButton(
+                          icon: Icons.group_outlined,
+                          color: onBg,
+                          onPressed: () {}),
                       const SizedBox(width: AppSpacing.xs),
-                      _HeaderIconButton(icon: Icons.notifications_none, color: onBg, onPressed: () {}),
+                      _HeaderIconButton(
+                          icon: Icons.notifications_none,
+                          color: onBg,
+                          onPressed: () {}),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -622,8 +715,13 @@ class InicioTopHeader extends StatelessWidget {
                               children: [
                                 Flexible(
                                   child: Text(
-                                    isSaldoVisible ? 'R\$ ${saldo.toStringAsFixed(2)}' : 'R\$ •••',
-                                    style: theme.textTheme.headlineSmall?.copyWith(color: onBg, fontWeight: FontWeight.w800),
+                                    isSaldoVisible
+                                        ? 'R\$ ${saldo.toStringAsFixed(2)}'
+                                        : 'R\$ •••',
+                                    style: theme.textTheme.headlineSmall
+                                        ?.copyWith(
+                                            color: onBg,
+                                            fontWeight: FontWeight.w800),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -632,19 +730,26 @@ class InicioTopHeader extends StatelessWidget {
                                 IconButton(
                                   onPressed: onToggleSaldoVisibility,
                                   icon: Icon(
-                                    isSaldoVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                    isSaldoVisible
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
                                     color: muted,
                                   ),
-                                  tooltip: isSaldoVisible ? 'Ocultar saldo' : 'Mostrar saldo',
+                                  tooltip: isSaldoVisible
+                                      ? 'Ocultar saldo'
+                                      : 'Mostrar saldo',
                                   style: IconButton.styleFrom(
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                     padding: const EdgeInsets.all(8),
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
-                            Text('Saldo', style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                            Text('Saldo',
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(color: muted)),
                           ],
                         ),
                       ),
@@ -652,8 +757,12 @@ class InicioTopHeader extends StatelessWidget {
                         onPressed: onTapCarteira,
                         style: TextButton.styleFrom(
                           foregroundColor: onBg,
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                              vertical: AppSpacing.xs),
+                          shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.xl)),
                         ),
                         icon: Icon(Icons.north_east, size: 18, color: onBg),
                         label: const Text('Minha carteira'),
@@ -675,8 +784,13 @@ class InicioTopHeader extends StatelessWidget {
                       Expanded(
                         child: Row(
                           children: [
-                            Expanded(child: Text('Localização ativa', style: theme.textTheme.bodyMedium?.copyWith(color: onBg))),
-                            Text('Atualizando', style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                            Expanded(
+                                child: Text('Localização ativa',
+                                    style: theme.textTheme.bodyMedium
+                                        ?.copyWith(color: onBg))),
+                            Text('Atualizando',
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(color: muted)),
                           ],
                         ),
                       ),
@@ -688,11 +802,15 @@ class InicioTopHeader extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: onTapExplorar,
                       icon: Icon(Icons.explore_outlined, size: 18, color: onBg),
-                      label: Text('Explorar cargas', style: TextStyle(color: onBg, fontWeight: FontWeight.w700)),
+                      label: Text('Explorar cargas',
+                          style: TextStyle(
+                              color: onBg, fontWeight: FontWeight.w700)),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: onBg.withValues(alpha: 0.25)),
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.xl)),
                       ),
                     ),
                   ),
@@ -713,7 +831,7 @@ class InicioTopHeader extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 0),
       ],
     );
   }
@@ -734,36 +852,47 @@ class InicioSearchCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = (origemLabel == null || origemLabel!.trim().isEmpty) ? 'sua localização' : origemLabel!.trim();
+    final label = (origemLabel == null || origemLabel!.trim().isEmpty)
+        ? 'sua localização'
+        : origemLabel!.trim();
     return Material(
       color: theme.colorScheme.surface,
       borderRadius: BorderRadius.circular(AppRadius.xl),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppRadius.xl),
-          border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.14)),
+          border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.14)),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
+        padding:
+            const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
         child: Row(
           children: [
-            Icon(Icons.location_on_outlined, color: theme.colorScheme.onSurfaceVariant),
+            Icon(Icons.location_on_outlined,
+                color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: TextField(
                 controller: controller,
                 textInputAction: TextInputAction.search,
-                onSubmitted: (v) => onSubmitted(v.trim().isEmpty ? label : v.trim()),
+                onSubmitted: (v) =>
+                    onSubmitted(v.trim().isEmpty ? label : v.trim()),
                 decoration: InputDecoration(
                   hintText: 'Origem: $label',
-                  hintStyle: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  hintStyle: theme.textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                   border: InputBorder.none,
                 ),
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
             IconButton(
-              onPressed: () => onSubmitted(controller.text.trim().isEmpty ? label : controller.text.trim()),
-              icon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
+              onPressed: () => onSubmitted(controller.text.trim().isEmpty
+                  ? label
+                  : controller.text.trim()),
+              icon:
+                  Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
               tooltip: 'Pesquisar',
             ),
           ],
@@ -774,7 +903,8 @@ class InicioSearchCard extends StatelessWidget {
 }
 
 class InicioSectionHeader extends StatelessWidget {
-  const InicioSectionHeader({super.key, required this.title, this.trailing, this.onTrailingTap});
+  const InicioSectionHeader(
+      {super.key, required this.title, this.trailing, this.onTrailingTap});
   final String title;
   final String? trailing;
   final VoidCallback? onTrailingTap;
@@ -784,11 +914,16 @@ class InicioSectionHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return Row(
       children: [
-        Expanded(child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
+        Expanded(
+            child: Text(title,
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800))),
         if (trailing != null)
           TextButton(
             onPressed: onTrailingTap,
-            child: Text(trailing!, style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+            child: Text(trailing!,
+                style: theme.textTheme.labelLarge
+                    ?.copyWith(fontWeight: FontWeight.w700)),
           ),
       ],
     );
@@ -837,7 +972,8 @@ class InicioCargasProximasCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Sem cargas para mostrar agora. Tente explorar.',
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -851,7 +987,6 @@ class InicioCargasProximasCard extends StatelessWidget {
       );
     }
 
-    // Mesmo card do Explorar, mas em rolagem horizontal na Home.
     return SizedBox(
       height: 232,
       child: ListView.separated(
@@ -883,14 +1018,17 @@ class _CargaCardSkeleton extends StatefulWidget {
   State<_CargaCardSkeleton> createState() => _CargaCardSkeletonState();
 }
 
-class _CargaCardSkeletonState extends State<_CargaCardSkeleton> with SingleTickerProviderStateMixin {
+class _CargaCardSkeletonState extends State<_CargaCardSkeleton>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _t;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900))
+      ..repeat(reverse: true);
     _t = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
   }
 
@@ -903,8 +1041,10 @@ class _CargaCardSkeletonState extends State<_CargaCardSkeleton> with SingleTicke
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final base = theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45);
-    final highlight = theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.20);
+    final base =
+        theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45);
+    final highlight =
+        theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.20);
 
     return SizedBox(
       width: widget.width,
@@ -935,9 +1075,17 @@ class _CargaCardSkeletonState extends State<_CargaCardSkeleton> with SingleTicke
                   const SizedBox(height: AppSpacing.md),
                   Row(
                     children: [
-                      Expanded(child: _SkelBox(width: double.infinity, height: 40, color: color)),
+                      Expanded(
+                          child: _SkelBox(
+                              width: double.infinity,
+                              height: 40,
+                              color: color)),
                       const SizedBox(width: AppSpacing.sm),
-                      Expanded(child: _SkelBox(width: double.infinity, height: 40, color: color)),
+                      Expanded(
+                          child: _SkelBox(
+                              width: double.infinity,
+                              height: 40,
+                              color: color)),
                     ],
                   ),
                   const Spacer(),
@@ -959,7 +1107,8 @@ class _CargaCardSkeletonState extends State<_CargaCardSkeleton> with SingleTicke
 }
 
 class _SkelBox extends StatelessWidget {
-  const _SkelBox({required this.width, required this.height, required this.color});
+  const _SkelBox(
+      {required this.width, required this.height, required this.color});
   final double width;
   final double height;
   final Color color;
@@ -978,7 +1127,8 @@ class _SkelBox extends StatelessWidget {
 }
 
 class InicioEntregaCompactTile extends StatelessWidget {
-  const InicioEntregaCompactTile({super.key, required this.entrega, required this.onTap});
+  const InicioEntregaCompactTile(
+      {super.key, required this.entrega, required this.onTap});
 
   final Entrega entrega;
   final VoidCallback onTap;
@@ -987,7 +1137,9 @@ class InicioEntregaCompactTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final carga = entrega.carga;
-    final destino = carga?.destino != null ? '${carga!.destino!.cidade}, ${carga.destino!.estado}' : 'Destino não informado';
+    final destino = carga?.destino != null
+        ? '${carga!.destino!.cidade}, ${carga.destino!.estado}'
+        : 'Destino não informado';
     final title = carga?.descricao ?? 'Entrega';
 
     final statusColor = switch (entrega.status) {
@@ -1006,7 +1158,8 @@ class InicioEntregaCompactTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.md),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 12),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: 12),
           child: Row(
             children: [
               Container(
@@ -1015,9 +1168,11 @@ class InicioEntregaCompactTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.14)),
+                  border: Border.all(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.14)),
                 ),
-                child: Icon(Icons.local_shipping_outlined, color: theme.colorScheme.onSurface),
+                child: Icon(Icons.local_shipping_outlined,
+                    color: theme.colorScheme.onSurface),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
@@ -1025,27 +1180,39 @@ class InicioEntregaCompactTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(title,
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
-                    Text(destino, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(destino,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm, vertical: 6),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppRadius.lg),
-                  border: Border.all(color: statusColor.withValues(alpha: 0.20)),
+                  border:
+                      Border.all(color: statusColor.withValues(alpha: 0.20)),
                 ),
                 child: Text(
                   entrega.status.displayName,
-                  style: theme.textTheme.labelSmall?.copyWith(color: statusColor, fontWeight: FontWeight.w800),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                      color: statusColor, fontWeight: FontWeight.w800),
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),
-              Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+              Icon(Icons.chevron_right,
+                  color: theme.colorScheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -1055,7 +1222,8 @@ class InicioEntregaCompactTile extends StatelessWidget {
 }
 
 class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({required this.icon, required this.color, required this.onPressed});
+  const _HeaderIconButton(
+      {required this.icon, required this.color, required this.onPressed});
   final IconData icon;
   final Color color;
   final VoidCallback onPressed;
@@ -1068,7 +1236,8 @@ class _HeaderIconButton extends StatelessWidget {
       style: IconButton.styleFrom(
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.all(10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.xl)),
         backgroundColor: Colors.transparent,
       ),
     );
@@ -1091,8 +1260,12 @@ class _DriverAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(size),
         color: theme.colorScheme.surface.withValues(alpha: 0.12),
-        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.35), width: 1),
-        image: hasUrl ? DecorationImage(image: NetworkImage(url!.trim()), fit: BoxFit.cover) : null,
+        border: Border.all(
+            color: theme.colorScheme.primary.withValues(alpha: 0.35), width: 1),
+        image: hasUrl
+            ? DecorationImage(
+                image: NetworkImage(url!.trim()), fit: BoxFit.cover)
+            : null,
       ),
       child: !hasUrl
           ? Center(
