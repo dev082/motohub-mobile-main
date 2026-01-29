@@ -1,9 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:hubfrete/models/entrega.dart';
-import 'package:hubfrete/models/location_point.dart';
-import 'package:hubfrete/services/cache_service.dart';
-import 'package:hubfrete/services/location_tracking_service.dart';
+// Rastreamento removido: LocationPoint/CacheService/LocationTrackingService
 import 'package:hubfrete/services/notification_service.dart';
 import 'package:hubfrete/services/storage_upload_service.dart';
 import 'package:hubfrete/supabase/supabase_config.dart';
@@ -181,33 +179,7 @@ class EntregaService {
 
   /// Handle automatic tracking start/stop based on status
   Future<void> _handleTrackingForStatus(String entregaId, StatusEntrega status) async {
-    try {
-      final entrega = await getEntregaById(entregaId);
-      if (entrega == null || entrega.motoristaId == null) return;
-
-      // Start tracking when collection begins
-      if (status == StatusEntrega.saiuParaColeta) {
-        debugPrint('🚀 Auto-starting tracking for entrega $entregaId');
-        final ok = await LocationTrackingService.instance.startTracking(
-          entregaId,
-          entrega.motoristaId!,
-        );
-        if (!ok) {
-          debugPrint('⚠️ Tracking not started (missing permissions or other issue) for entrega $entregaId');
-        }
-      }
-      // Stop tracking when delivery is completed or cancelled
-      else if ([
-        StatusEntrega.entregue,
-        StatusEntrega.cancelada,
-        StatusEntrega.problema,
-      ].contains(status)) {
-        debugPrint('🛑 Auto-stopping tracking for entrega $entregaId');
-        await LocationTrackingService.instance.stopTracking();
-      }
-    } catch (e) {
-      debugPrint('Handle tracking for status error: $e');
-    }
+    // tracking removido (será refeito do zero).
   }
 
   /// Send notification for status change
@@ -246,24 +218,10 @@ class EntregaService {
   /// Insert tracking history
   Future<void> _insertTrackingHistory(String entregaId, StatusEntrega status, String? observacao) async {
     try {
-      // Best-effort: attach last known location/heading to the status event.
-      // This helps the backend correlate status transitions with a map point.
-      LocationPoint? last;
-      try {
-        final cached = await CacheService.getCachedLocations(entregaId, limit: 1);
-        if (cached.isNotEmpty) last = cached.first;
-      } catch (e) {
-        debugPrint('EntregaService._insertTrackingHistory: failed to read cached location: $e');
-      }
-
       final basePayload = <String, dynamic>{
         'entrega_id': entregaId,
         'status': status.value,
         'observacao': observacao,
-        'latitude': last?.latitude,
-        'longitude': last?.longitude,
-        // Column used by the existing tracking upload pipeline.
-        'bussola_pos': _normalizeHeading(last?.heading),
         'created_at': DateTime.now().toIso8601String(),
       }..removeWhere((k, v) => v == null);
 
@@ -291,13 +249,6 @@ class EntregaService {
   }
 
   static final RegExp _missingColumnRegex = RegExp(r"Could not find the '([^']+)' column", caseSensitive: false);
-
-  double? _normalizeHeading(double? heading) {
-    if (heading == null) return null;
-    if (heading.isNaN || !heading.isFinite) return null;
-    if (heading < 0) return null;
-    return heading % 360.0;
-  }
 
   /// Upload comprovante (POD) for coleta/entrega.
   ///

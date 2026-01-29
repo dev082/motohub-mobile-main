@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -6,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hubfrete/models/motorista.dart';
 import 'package:hubfrete/services/auth_service.dart';
-import 'package:hubfrete/services/location_service.dart';
-import 'package:hubfrete/services/location_tracking_service.dart';
 import 'package:hubfrete/services/notification_service.dart';
 import 'package:hubfrete/services/entrega_service.dart';
 import 'package:hubfrete/services/secure_storage_service.dart';
@@ -15,14 +12,15 @@ import 'package:hubfrete/services/storage_upload_service.dart';
 import 'package:hubfrete/models/app_user_alert.dart';
 import 'package:hubfrete/supabase/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hubfrete/services/location_tracking_service.dart';
+import 'package:hubfrete/models/tracking_state.dart';
+import 'package:hubfrete/models/entrega.dart';
 
 /// Main app provider for managing global state
 class AppProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
-  final LocationService _locationService = LocationService();
   final EntregaService _entregaService = EntregaService();
-
-  Timer? _ensureTrackingTimer;
+  final LocationTrackingService _trackingService = LocationTrackingService.instance;
 
   RealtimeChannel? _mensagensChannel;
   RealtimeChannel? _entregasAssignmentsChannel;
@@ -52,8 +50,16 @@ class AppProvider with ChangeNotifier {
   AppProvider() {
     _initializeAuth();
     _setupAuthListener();
-    _initializeTrackingService();
     _loadThemeMode();
+    _initializeTracking();
+  }
+
+  Future<void> _initializeTracking() async {
+    try {
+      await _trackingService.initialize();
+    } catch (e) {
+      debugPrint('[AppProvider] Erro ao inicializar rastreamento: $e');
+    }
   }
 
   static const String _lastAuthUserIdKey = 'last_auth_user_id';
@@ -98,14 +104,6 @@ class AppProvider with ChangeNotifier {
       );
     } catch (e) {
       debugPrint('Persist themeMode error: $e');
-    }
-  }
-
-  Future<void> _initializeTrackingService() async {
-    try {
-      await LocationTrackingService.instance.init();
-    } catch (e) {
-      debugPrint('Initialize tracking service error: $e');
     }
   }
 
@@ -284,8 +282,6 @@ class AppProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
   AppUserAlert? get activeUserAlert => _userAlerts.isEmpty ? null : _userAlerts.first;
   bool get isAuthenticated => _currentMotorista != null;
-  LocationService get locationService => _locationService;
-
   static String _activeEntregaStorageKey(String motoristaId) => 'active_entrega_id:$motoristaId';
 
   Future<void> setActiveEntregaId(String? entregaId) async {
@@ -298,12 +294,38 @@ class AppProvider with ChangeNotifier {
     try {
       if (entregaId == null || entregaId.isEmpty) {
         await SecureStorageService.delete(key);
+        // Para rastreamento quando não há entrega ativa
+        await _trackingService.updateTrackingState(TrackingState.onlineSemEntrega);
       } else {
         await SecureStorageService.write(key, entregaId);
+        // Busca status da entrega para definir estado de rastreamento
+        await _updateTrackingForEntrega(entregaId);
       }
     } catch (e) {
-      // Não queremos travar a UI se storage falhar.
       debugPrint('Persist activeEntregaId error: $e');
+    }
+  }
+
+  Future<void> _updateTrackingForEntrega(String entregaId) async {
+    try {
+      final data = await SupabaseConfig.client.from('entregas').select('status').eq('id', entregaId).maybeSingle();
+      if (data == null) return;
+
+      final statusStr = data['status'] as String?;
+      if (statusStr == null) return;
+
+      final status = StatusEntrega.fromString(statusStr);
+      final trackingState = switch (status) {
+        StatusEntrega.aguardando => TrackingState.onlineSemEntrega,
+        StatusEntrega.saiuParaColeta => TrackingState.emRotaColeta,
+        StatusEntrega.saiuParaEntrega => TrackingState.emEntrega,
+        StatusEntrega.entregue || StatusEntrega.cancelada => TrackingState.finalizado,
+        StatusEntrega.problema => TrackingState.emEntrega,
+      };
+
+      await _trackingService.updateTrackingState(trackingState, entregaId: entregaId);
+    } catch (e) {
+      debugPrint('Update tracking for entrega error: $e');
     }
   }
 
@@ -354,15 +376,11 @@ class AppProvider with ChangeNotifier {
   /// Sign out
   Future<void> signOut() async {
     try {
-      // Stop location tracking if active
-      _locationService.stopTracking();
-      await LocationTrackingService.instance.stopTracking();
-
-      _ensureTrackingTimer?.cancel();
-      _ensureTrackingTimer = null;
-
       await _stopChatNotifications();
       await _stopEntregaAssignmentRealtime();
+      
+      // Para rastreamento ao fazer logout
+      await _trackingService.stopTracking();
       
       await _authService.signOut();
 
@@ -382,58 +400,6 @@ class AppProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Sign out error: $e');
-    }
-  }
-
-  void _startEnsureTrackingLoop() {
-    _ensureTrackingTimer?.cancel();
-    // Best-effort watchdog: guarantees tracking stays on while there is an active entrega.
-    _ensureTrackingTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
-      await ensureTrackingForActiveEntrega();
-    });
-  }
-
-  /// Ensures background tracking is running while the motorista has at least one active entrega.
-  ///
-  /// This is called:
-  /// - after login/session restore
-  /// - when an entrega is assigned via realtime
-  /// - periodically (watchdog) while authenticated
-  Future<void> ensureTrackingForActiveEntrega() async {
-    final motorista = _currentMotorista;
-    if (motorista == null) return;
-
-    try {
-      // Prefer the user-selected activeEntregaId.
-      String? entregaId = _activeEntregaId;
-
-      // If none selected, pick the most recent active entrega.
-      if (entregaId == null || entregaId.isEmpty) {
-        final active = await _entregaService.getMotoristaEntregas(motorista.id, activeOnly: true);
-        if (active.isNotEmpty) {
-          entregaId = active.first.id;
-          // Persist selection so other screens stay consistent.
-          await setActiveEntregaId(entregaId);
-        }
-      }
-
-      // No active entrega -> stop tracking.
-      if (entregaId == null || entregaId.isEmpty) {
-        if (LocationTrackingService.instance.isTracking) {
-          await LocationTrackingService.instance.stopTracking();
-        }
-        return;
-      }
-
-      // There is an active entrega -> ensure tracking is active for this entrega.
-      if (!LocationTrackingService.instance.isTracking || LocationTrackingService.instance.currentEntregaId != entregaId) {
-        final ok = await LocationTrackingService.instance.startTracking(entregaId, motorista.id);
-        if (!ok) {
-          debugPrint('⚠️ ensureTrackingForActiveEntrega: startTracking failed. lastError=${LocationTrackingService.instance.lastError}');
-        }
-      }
-    } catch (e) {
-      debugPrint('ensureTrackingForActiveEntrega error: $e');
     }
   }
 
@@ -545,8 +511,13 @@ class AppProvider with ChangeNotifier {
           motoristaId: motorista.id,
         );
 
-        // Ensure tracking kicks in as soon as the driver receives an active entrega.
-        await ensureTrackingForActiveEntrega();
+        // Inicia rastreamento quando uma entrega é atribuída
+        if (motorista.email != null && motorista.email!.isNotEmpty) {
+          await _trackingService.startTracking(
+            emailMotorista: motorista.email!,
+            initialState: TrackingState.onlineSemEntrega,
+          );
+        }
       } catch (e) {
         debugPrint('Entrega assignment realtime callback error: $e');
       }
@@ -683,9 +654,14 @@ class AppProvider with ChangeNotifier {
         await _persistCachedMotorista(motorista);
         await _startChatNotifications();
         await _startEntregaAssignmentRealtime();
-
-        _startEnsureTrackingLoop();
-        await ensureTrackingForActiveEntrega();
+        
+        // Inicia rastreamento online
+        if (motorista.email != null && motorista.email!.isNotEmpty) {
+          await _trackingService.startTracking(
+            emailMotorista: motorista.email!,
+            initialState: TrackingState.onlineSemEntrega,
+          );
+        }
       }
     } catch (e) {
       debugPrint('Load current motorista error: $e');

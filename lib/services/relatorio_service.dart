@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:hubfrete/models/entrega.dart';
 import 'package:hubfrete/models/relatorio_motorista.dart';
-import 'package:hubfrete/services/location_service.dart';
 import 'package:hubfrete/services/entrega_service.dart';
 import 'package:hubfrete/supabase/supabase_config.dart';
 
@@ -14,11 +13,19 @@ import 'package:hubfrete/supabase/supabase_config.dart';
 /// - This is best-effort and depends on tracking data existing.
 class RelatorioService {
   final EntregaService _entregaService;
-  final LocationService _locationService;
 
-  RelatorioService({EntregaService? entregaService, LocationService? locationService})
-      : _entregaService = entregaService ?? EntregaService(),
-        _locationService = locationService ?? LocationService();
+  RelatorioService({EntregaService? entregaService}) : _entregaService = entregaService ?? EntregaService();
+
+  double _distanceMeters(double lat1, double lon1, double lat2, double lon2) {
+    const earthRadius = 6371000.0;
+    final dLat = _toRadians(lat2 - lat1);
+    final dLon = _toRadians(lon2 - lon1);
+    final a = sin(dLat / 2) * sin(dLat / 2) + cos(_toRadians(lat1)) * cos(_toRadians(lat2)) * sin(dLon / 2) * sin(dLon / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  double _toRadians(double deg) => deg * pi / 180.0;
 
   Future<RelatorioMotorista> buildMotoristaReport(
     String motoristaId, {
@@ -143,7 +150,7 @@ class RelatorioService {
             .toList();
 
         for (var i = 1; i < list.length; i++) {
-          totalMeters += _locationService.calculateDistance(list[i - 1].lat, list[i - 1].lon, list[i].lat, list[i].lon);
+          totalMeters += _distanceMeters(list[i - 1].lat, list[i - 1].lon, list[i].lat, list[i].lon);
         }
       } catch (err) {
         debugPrint('RelatorioService estimate km for entrega=${e.id} error: $err');

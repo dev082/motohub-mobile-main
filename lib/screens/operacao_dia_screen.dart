@@ -7,7 +7,6 @@ import 'package:hubfrete/nav.dart';
 import 'package:hubfrete/providers/app_provider.dart';
 import 'package:hubfrete/services/entrega_service.dart';
 import 'package:hubfrete/services/documento_validacao_service.dart';
-import 'package:hubfrete/services/location_tracking_service.dart';
 import 'package:hubfrete/theme.dart';
 import 'package:hubfrete/widgets/app_drawer.dart';
 import 'package:provider/provider.dart';
@@ -29,27 +28,15 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
   List<Entrega> _proximasEntregas = [];
   List<DocumentoValidacao> _documentosAlerta = [];
   bool _isLoading = true;
-  bool _isTrackingAtivo = false;
-  VoidCallback? _trackingListener;
 
   @override
   void initState() {
     super.initState();
     _loadDados();
-    _isTrackingAtivo = LocationTrackingService.instance.isTracking;
-    _trackingListener = () {
-      if (!mounted) return;
-      setState(() => _isTrackingAtivo = LocationTrackingService.instance.isTrackingNotifier.value);
-    };
-    LocationTrackingService.instance.isTrackingNotifier.addListener(_trackingListener!);
   }
 
   @override
   void dispose() {
-    final l = _trackingListener;
-    if (l != null) {
-      LocationTrackingService.instance.isTrackingNotifier.removeListener(l);
-    }
     super.dispose();
   }
 
@@ -77,9 +64,6 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
     }
   }
 
-  Future<void> _checkTrackingStatus() async =>
-      setState(() => _isTrackingAtivo = LocationTrackingService.instance.isTracking);
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -98,14 +82,7 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
           ],
         ),
         actions: [
-          IconButton(
-              icon: Icon(
-                _isTrackingAtivo ? Icons.gps_fixed : Icons.gps_off,
-                color: _isTrackingAtivo ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
-              ),
-            onPressed: _toggleTracking,
-            tooltip: _isTrackingAtivo ? 'Sim, está funcionando.' : 'Não, não está funcionando.',
-          ),
+          // Botão de rastreio removido (sistema será refeito do zero).
         ],
       ),
       body: _isLoading
@@ -491,33 +468,5 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
     );
   }
 
-  Future<void> _toggleTracking() async {
-    final motorista = context.read<AppProvider>().currentMotorista;
-    if (motorista == null) return;
-    
-    if (_isTrackingAtivo) {
-      await LocationTrackingService.instance.stopTracking();
-    } else {
-      if (_entregaAtual == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sem entrega ativa para iniciar o rastreamento.')),
-        );
-        return;
-      }
-
-      final ok = await LocationTrackingService.instance.startTracking(_entregaAtual!.id, motorista.id);
-      if (!ok && mounted) {
-        final reason = LocationTrackingService.instance.lastError;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              reason ?? 'Não foi possível iniciar o rastreador. Verifique as permissões de localização.',
-            ),
-          ),
-        );
-      }
-    }
-    await _checkTrackingStatus();
-  }
+  // _toggleTracking removido.
 }

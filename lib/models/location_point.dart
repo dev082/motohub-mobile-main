@@ -1,89 +1,68 @@
-/// Location point model for real-time tracking
+/// Ponto de localização capturado
 class LocationPoint {
   final String id;
-  final String entregaId;
-  final String motoristaId;
+  final String emailMotorista;
+  final String? entregaId;
   final double latitude;
   final double longitude;
-  final double? accuracy;
-  final double? speed;
+  final double? precisao;
+  final double? velocidade;
   final double? heading;
-  final double? altitude;
-  final int? batteryLevel;
-  final bool isMoving;
-  final DateTime createdAt;
+  final DateTime timestamp;
+  final String status;
+  final bool synced;
 
   LocationPoint({
     required this.id,
-    required this.entregaId,
-    required this.motoristaId,
+    required this.emailMotorista,
+    this.entregaId,
     required this.latitude,
     required this.longitude,
-    this.accuracy,
-    this.speed,
+    this.precisao,
+    this.velocidade,
     this.heading,
-    this.altitude,
-    this.batteryLevel,
-    this.isMoving = true,
-    required this.createdAt,
+    required this.timestamp,
+    required this.status,
+    this.synced = false,
   });
-
-  factory LocationPoint.fromJson(Map<String, dynamic> json) => LocationPoint(
-        id: json['id'] as String,
-        entregaId: json['entrega_id'] as String,
-        motoristaId: json['motorista_id'] as String,
-        latitude: (json['latitude'] as num).toDouble(),
-        longitude: (json['longitude'] as num).toDouble(),
-        accuracy: json['accuracy'] != null ? (json['accuracy'] as num).toDouble() : null,
-        speed: json['speed'] != null ? (json['speed'] as num).toDouble() : null,
-        heading: json['heading'] != null ? (json['heading'] as num).toDouble() : null,
-        altitude: json['altitude'] != null ? (json['altitude'] as num).toDouble() : null,
-        batteryLevel: json['battery_level'] as int?,
-        isMoving: json['is_moving'] as bool? ?? true,
-        createdAt: DateTime.parse(json['created_at'] as String),
-      );
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'email_motorista': emailMotorista,
         'entrega_id': entregaId,
-        'motorista_id': motoristaId,
         'latitude': latitude,
         'longitude': longitude,
-        'accuracy': accuracy,
-        'speed': speed,
-        'heading': heading,
-        'altitude': altitude,
-        'battery_level': batteryLevel,
-        'is_moving': isMoving,
-        'created_at': createdAt.toIso8601String(),
+        'precisao': precisao,
+        'velocidade': velocidade,
+        'bussola_pos': heading,
+        'timestamp': timestamp.millisecondsSinceEpoch,
+        'status': status,
+        'synced': synced ? 1 : 0,
       };
 
-  LocationPoint copyWith({
-    String? id,
-    String? entregaId,
-    String? motoristaId,
-    double? latitude,
-    double? longitude,
-    double? accuracy,
-    double? speed,
-    double? heading,
-    double? altitude,
-    int? batteryLevel,
-    bool? isMoving,
-    DateTime? createdAt,
-  }) =>
-      LocationPoint(
-        id: id ?? this.id,
-        entregaId: entregaId ?? this.entregaId,
-        motoristaId: motoristaId ?? this.motoristaId,
-        latitude: latitude ?? this.latitude,
-        longitude: longitude ?? this.longitude,
-        accuracy: accuracy ?? this.accuracy,
-        speed: speed ?? this.speed,
-        heading: heading ?? this.heading,
-        altitude: altitude ?? this.altitude,
-        batteryLevel: batteryLevel ?? this.batteryLevel,
-        isMoving: isMoving ?? this.isMoving,
-        createdAt: createdAt ?? this.createdAt,
+  factory LocationPoint.fromJson(Map<String, dynamic> json) => LocationPoint(
+        id: json['id'] as String,
+        emailMotorista: json['email_motorista'] as String,
+        entregaId: json['entrega_id'] as String?,
+        latitude: (json['latitude'] as num).toDouble(),
+        longitude: (json['longitude'] as num).toDouble(),
+        precisao: json['precisao'] != null ? (json['precisao'] as num).toDouble() : null,
+        velocidade: json['velocidade'] != null ? (json['velocidade'] as num).toDouble() : null,
+        heading: json['bussola_pos'] != null ? (json['bussola_pos'] as num).toDouble() : null,
+        timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp'] as int),
+        status: json['status'] as String,
+        synced: (json['synced'] as int) == 1,
       );
+
+  Map<String, dynamic> toSupabaseJson() => {
+        'email_motorista': emailMotorista,
+        'latitude': latitude,
+        'longitude': longitude,
+        'precisao': precisao,
+        'velocidade': velocidade,
+        'bussola_pos': heading,
+        'timestamp': timestamp.millisecondsSinceEpoch,
+        'status': status == 'online' || status == 'em_rota' || status == 'em_entrega',
+        'visivel': true,
+      };
 }

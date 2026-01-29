@@ -4,7 +4,6 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hubfrete/providers/app_provider.dart';
-import 'package:hubfrete/services/cache_service.dart';
 import 'package:hubfrete/services/notification_service.dart';
 import 'package:hubfrete/supabase/supabase_config.dart';
 import 'package:hubfrete/widgets/in_app_error_overlay.dart';
@@ -30,9 +29,6 @@ void main() async {
   
   // Inicializa Supabase com persistência automática de sessão
   await SupabaseConfig.initialize();
-
-  // Initialize Hive cache for offline-first tracking
-  await CacheService.init();
 
   // Best-effort init for local notifications (Android/iOS). On web it's a no-op.
   await NotificationService.instance.init();
