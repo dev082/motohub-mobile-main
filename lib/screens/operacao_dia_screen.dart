@@ -14,6 +14,7 @@ import 'package:hubfrete/services/entrega_service.dart';
 import 'package:hubfrete/services/documento_validacao_service.dart';
 import 'package:hubfrete/theme.dart';
 import 'package:hubfrete/widgets/carga_card.dart';
+import 'package:hubfrete/widgets/tracking_status_banner.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -196,6 +197,8 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
               ),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
+                  const TrackingStatusBanner(),
+                  const SizedBox(height: AppSpacing.sm),
                   // --- CORREÇÃO 1: Agrupamento condicional ---
                   // O SizedBox só aparece se o alerta aparecer.
                   if (!_isLoading && _documentosAlerta.isNotEmpty) ...[

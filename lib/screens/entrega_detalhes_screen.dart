@@ -10,6 +10,7 @@ import 'package:hubfrete/widgets/attachment_pickers.dart';
 import 'package:hubfrete/widgets/canhoto_upload_sheet.dart';
 import 'package:hubfrete/widgets/checklist_veiculo_sheet.dart';
 import 'package:hubfrete/widgets/entrega_timeline_widget.dart';
+import 'package:hubfrete/widgets/tracking_permission_sheet.dart';
 
 /// Tela de detalhes da entrega com timeline, POD e ações
 class EntregaDetalhesScreen extends StatefulWidget {
@@ -371,6 +372,16 @@ class _EntregaDetalhesScreenState extends State<EntregaDetalhesScreen> with Sing
   }
 
   Future<void> _mudarStatus(StatusEntrega novoStatus) async {
+    final isStartOperation =
+        (novoStatus == StatusEntrega.saiuParaColeta) || (novoStatus == StatusEntrega.saiuParaEntrega);
+    if (isStartOperation) {
+      final ok = await TrackingPermissionSheet.ensureTrackingReady(
+        context,
+        reason: 'Para iniciar a viagem, precisamos da sua localização ativa (mesmo com Waze/Maps aberto).',
+      );
+      if (!ok) return;
+    }
+
     // Ao iniciar a operação (coleta/entrega), exigir checklist do veículo.
     // Se já existe checklist salvo na entrega, não pedir novamente.
     final shouldRequireChecklist =

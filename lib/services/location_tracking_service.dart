@@ -6,8 +6,38 @@ import 'package:hubfrete/models/location_point.dart';
 import 'package:hubfrete/models/tracking_state.dart';
 import 'package:hubfrete/services/location_database_service.dart';
 import 'package:hubfrete/services/location_sync_service.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+
+/// Snapshot consolidado das permissões/requisitos para rastreamento funcionar bem.
+class TrackingReadiness {
+  final LocationPermission locationPermission;
+  final bool notificationGranted;
+  final bool ignoreBatteryOptimizationsGranted;
+
+  const TrackingReadiness({
+    required this.locationPermission,
+    required this.notificationGranted,
+    required this.ignoreBatteryOptimizationsGranted,
+  });
+
+  bool get hasAnyLocation =>
+      locationPermission == LocationPermission.always || locationPermission == LocationPermission.whileInUse;
+
+  bool get hasAlwaysLocation => locationPermission == LocationPermission.always;
+
+  /// Regras práticas:
+  /// - Precisa de localização (always/whileInUse)
+  /// - No Android, para manter o foreground service do Geolocator com notificação persistente,
+  ///   é necessário ter permissão de notificação (Android 13+).
+  bool get canStartTracking {
+    if (!hasAnyLocation) return false;
+    if (kIsWeb) return true;
+    if (defaultTargetPlatform == TargetPlatform.android) return notificationGranted;
+    return true;
+  }
+}
 
 /// Serviço principal de rastreamento de localização
 class LocationTrackingService {
@@ -202,6 +232,18 @@ class LocationTrackingService {
   Future<bool> checkPermissions() async {
     final status = await Geolocator.checkPermission();
     return status == LocationPermission.always || status == LocationPermission.whileInUse;
+  }
+
+  Future<TrackingReadiness> getTrackingReadiness() async {
+    final location = await Geolocator.checkPermission();
+    final isAndroid = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+    final notifications = !isAndroid ? true : await ph.Permission.notification.isGranted;
+    final battery = !isAndroid ? true : await ph.Permission.ignoreBatteryOptimizations.isGranted;
+    return TrackingReadiness(
+      locationPermission: location,
+      notificationGranted: notifications,
+      ignoreBatteryOptimizationsGranted: battery,
+    );
   }
 
   /// Solicita permissões de localização

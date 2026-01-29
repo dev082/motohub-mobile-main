@@ -6,8 +6,6 @@ import 'package:hubfrete/screens/entregas_screen.dart';
 import 'package:hubfrete/screens/chat_list_screen.dart';
 import 'package:hubfrete/screens/explorar_screen.dart';
 import 'package:hubfrete/screens/perfil_screen.dart';
-import 'package:hubfrete/services/location_tracking_service.dart';
-import 'package:hubfrete/widgets/tracking_permission_blocker.dart';
 
 /// Main screen with bottom navigation
 class MainScreen extends StatefulWidget {
@@ -22,8 +20,6 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
-  bool _permissionsGranted = false;
-  bool _isCheckingPermissions = true;
 
   final List<Widget> _screens = const [
     OperacaoDiaScreen(),
@@ -36,27 +32,12 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    _checkPermissions();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _syncFromQuery();
-  }
-
-  Future<void> _checkPermissions() async {
-    final hasPermissions = await LocationTrackingService.instance.checkPermissions();
-    if (mounted) {
-      setState(() {
-        _permissionsGranted = hasPermissions;
-        _isCheckingPermissions = false;
-      });
-    }
-  }
-
-  void _onPermissionsGranted() {
-    setState(() => _permissionsGranted = true);
   }
 
   void _syncFromQuery() {
@@ -110,16 +91,6 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isCheckingPermissions) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (!_permissionsGranted) {
-      return TrackingPermissionBlocker(onPermissionsGranted: _onPermissionsGranted);
-    }
-
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: NavigationBar(

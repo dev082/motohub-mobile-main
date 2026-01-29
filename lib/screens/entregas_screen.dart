@@ -12,6 +12,7 @@ import 'package:hubfrete/widgets/attachment_pickers.dart';
 import 'package:hubfrete/widgets/app_drawer.dart';
 import 'package:hubfrete/widgets/canhoto_upload_sheet.dart';
 import 'package:hubfrete/widgets/checklist_veiculo_sheet.dart';
+import 'package:hubfrete/widgets/tracking_permission_sheet.dart';
 import 'package:hubfrete/widgets/entrega_card.dart';
 import 'package:hubfrete/widgets/entrega_details_sheet.dart';
 import 'package:hubfrete/widgets/pull_to_refresh.dart';
@@ -180,6 +181,16 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
   Future<void> _advanceStage(Entrega entrega) async {
     final next = _nextStatus(entrega.status);
     if (next == null) return;
+
+    final isStartOperation =
+        (next == StatusEntrega.saiuParaColeta) || (next == StatusEntrega.saiuParaEntrega);
+    if (isStartOperation) {
+      final ok = await TrackingPermissionSheet.ensureTrackingReady(
+        context,
+        reason: 'Para iniciar a operação, habilite a localização e o rastreamento.',
+      );
+      if (!ok) return;
+    }
 
     setState(() => _updatingEntregaIds.add(entrega.id));
     try {
