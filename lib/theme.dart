@@ -187,10 +187,12 @@ class StatusColors {
 /// Keep these colors centralized to avoid hardcoding in widgets.
 class ChatColors {
   // Light mode
-  static const lightChatBackground = Color(0xFFCFEFEA);
+  // Minimal / neutral base (avoid strong green cast)
+  static const lightChatBackground = Color(0xFFF6F7F9);
   static const lightIncomingBubble = Color(0xFFFFFFFF);
-  static const lightOutgoingBubble = Color(0xFFD7F7B0);
-  static const lightDatePill = Color(0xFFE8F2F0);
+  // Slight tint to keep brand feel without “gritar” verde
+  static const lightOutgoingBubble = Color(0xFFF1F7F4);
+  static const lightDatePill = Color(0xFFEEF2F5);
 
   // Dark mode
   static const darkChatBackground = Color(0xFF0F2A29);

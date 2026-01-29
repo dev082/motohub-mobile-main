@@ -390,10 +390,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final isReadOnly = _isEntregaFinalizada;
 
+    final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+    final participants = _ChatParticipants.fromMessages(
+      messages: _messages,
+      currentUserId: currentUserId,
+    );
+
     return Scaffold(
       appBar: _ChatTopBar(
         title: title,
         subtitle: subtitle,
+        participants: participants,
         onOpenDetails: () {
           final entrega = _entrega;
           final chat = _chat;
@@ -425,6 +432,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: _ChatMessageList(
                           controller: _scrollController,
                           messages: _messages,
+                          currentUserId: currentUserId,
                         ),
                       ),
                       _ChatComposerBar(
@@ -628,10 +636,12 @@ class _ChatMessageList extends StatelessWidget {
   const _ChatMessageList({
     required this.controller,
     required this.messages,
+    required this.currentUserId,
   });
 
   final ScrollController controller;
   final List<Mensagem> messages;
+  final String? currentUserId;
 
   @override
   Widget build(BuildContext context) {
@@ -645,7 +655,7 @@ class _ChatMessageList extends StatelessWidget {
         children.add(const SizedBox(height: AppSpacing.sm));
         lastDay = day;
       }
-      children.add(_ChatMessageBubble(message: m));
+      children.add(_ChatMessageBubble(message: m, currentUserId: currentUserId));
     }
 
     return ListView(
@@ -694,9 +704,48 @@ class _DatePill extends StatelessWidget {
 }
 
 class _ChatMessageBubble extends StatelessWidget {
-  const _ChatMessageBubble({required this.message});
+  const _ChatMessageBubble({required this.message, required this.currentUserId});
 
   final Mensagem message;
+  final String? currentUserId;
+
+  static const double _avatarSize = 26;
+
+  static Color _avatarColor(ThemeData theme, TipoParticipante tipo) {
+    // Use “brand-y” but subtle colors derived from the theme.
+    final scheme = theme.colorScheme;
+    return switch (tipo) {
+      TipoParticipante.embarcador => scheme.primary.withValues(alpha: 0.16),
+      TipoParticipante.transportadora => scheme.tertiary.withValues(alpha: 0.18),
+      TipoParticipante.motorista => scheme.secondary.withValues(alpha: 0.18),
+    };
+  }
+
+  static String _initials(String name) {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.trim().isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    final first = parts.first;
+    final last = parts.length > 1 ? parts.last : '';
+    String firstChar(String s) {
+      final t = s.trim();
+      if (t.isEmpty) return '?';
+      return String.fromCharCode(t.runes.first);
+    }
+
+    final a = firstChar(first);
+    final b = last.isNotEmpty ? firstChar(last) : '';
+    return (a + b).toUpperCase();
+  }
+
+  static String _displaySenderLabel(Mensagem m) {
+    final name = m.senderNome.trim();
+    if (name.isNotEmpty) return name;
+    return m.senderTipo.displayName;
+  }
 
   static String? _resolveAttachmentUrl(Mensagem m, String? legacyFile) {
     final direct = m.anexoUrl;
@@ -728,25 +777,26 @@ class _ChatMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDriver = message.senderTipo == TipoParticipante.motorista;
+    final authUid = currentUserId;
+    final isMe = authUid != null && authUid == message.senderId;
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final bg = isDriver
+    final bg = isMe
         ? (isDark ? ChatColors.darkOutgoingBubble : ChatColors.lightOutgoingBubble)
         : (isDark ? ChatColors.darkIncomingBubble : ChatColors.lightIncomingBubble);
-    final fg = isDriver ? scheme.onSurface : scheme.onSurface;
+    final fg = scheme.onSurface;
     final timeColor = scheme.onSurfaceVariant;
 
     final radius = BorderRadius.only(
       topLeft: const Radius.circular(18),
       topRight: const Radius.circular(18),
-      bottomLeft: Radius.circular(isDriver ? 18 : 6),
-      bottomRight: Radius.circular(isDriver ? 6 : 18),
+      bottomLeft: Radius.circular(isMe ? 18 : 6),
+      bottomRight: Radius.circular(isMe ? 6 : 18),
     );
 
     final time = _formatTime(message.createdAt);
-    final ticks = isDriver
+    final ticks = isMe
         ? Icon(
             message.lida ? Icons.done_all : Icons.done,
             size: 16,
@@ -767,55 +817,96 @@ class _ChatMessageBubble extends StatelessWidget {
     // Se for o formato legado `@arquivo.ext`, não mostramos o texto do "@...".
     final hasText = message.conteudo.trim().isNotEmpty && !(message.isLegacyAttachmentOnly && legacyFile != null);
 
-    return Align(
-      alignment: isDriver ? Alignment.centerRight : Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 340),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-          padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: radius,
-            border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.9)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (hasAttachment) ...[
-                ChatAttachmentPreview(
-                  url: resolvedAttachmentUrl!,
-                  fileName: resolvedAttachmentName,
-                  contentType: resolvedAttachmentType,
-                  sizeBytes: message.anexoTamanho,
-                ),
-                if (hasText) const SizedBox(height: 10) else const SizedBox(height: 6),
-              ],
-              if (hasText) ...[
-                Text(
-                  message.conteudo,
-                  style: context.textStyles.bodyMedium?.copyWith(color: fg, height: 1.35),
-                ),
-                const SizedBox(height: 6),
-              ],
-              Row(
+    final senderLabel = _displaySenderLabel(message);
+    final showSenderHeader = !isMe;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          if (showSenderHeader)
+            Padding(
+              padding: const EdgeInsets.only(left: 2, bottom: 6),
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    time,
-                    style: context.textStyles.labelSmall
-                        ?.copyWith(color: timeColor.withValues(alpha: 0.8)),
+                  CircleAvatar(
+                    radius: _avatarSize / 2,
+                    backgroundColor: _avatarColor(Theme.of(context), message.senderTipo),
+                    child: Text(
+                      _initials(senderLabel),
+                      style: context.textStyles.labelSmall?.copyWith(
+                        color: scheme.onSurface,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                  if (ticks != null) ...[
-                    const SizedBox(width: 4),
-                    ticks,
-                  ]
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      '$senderLabel • ${message.senderTipo.displayName}',
+                      style: context.textStyles.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
-            ],
+            ),
+          Align(
+            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 340),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius: radius,
+                  border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.75)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (hasAttachment) ...[
+                      ChatAttachmentPreview(
+                        url: resolvedAttachmentUrl!,
+                        fileName: resolvedAttachmentName,
+                        contentType: resolvedAttachmentType,
+                        sizeBytes: message.anexoTamanho,
+                      ),
+                      if (hasText) const SizedBox(height: 10) else const SizedBox(height: 6),
+                    ],
+                    if (hasText) ...[
+                      Text(
+                        message.conteudo,
+                        style: context.textStyles.bodyMedium?.copyWith(color: fg, height: 1.35),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          time,
+                          style: context.textStyles.labelSmall?.copyWith(color: timeColor.withValues(alpha: 0.8)),
+                        ),
+                        if (ticks != null) ...[
+                          const SizedBox(width: 4),
+                          ticks,
+                        ]
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -825,11 +916,13 @@ class _ChatTopBar extends StatelessWidget implements PreferredSizeWidget {
   const _ChatTopBar({
     required this.title,
     required this.subtitle,
+    required this.participants,
     required this.onOpenDetails,
   });
 
   final String title;
   final String? subtitle;
+  final List<_ChatParticipantInfo> participants;
   final VoidCallback onOpenDetails;
 
   @override
@@ -838,6 +931,11 @@ class _ChatTopBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+
+    final visible = participants.take(3).toList();
+    final extraCount = participants.length - visible.length;
+
     return AppBar(
       leading: IconButton(
         onPressed: () => context.pop(),
@@ -853,10 +951,13 @@ class _ChatTopBar extends StatelessWidget implements PreferredSizeWidget {
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 18,
+              _ParticipantsAvatarStack(
+                participants: visible,
+                extraCount: extraCount,
                 backgroundColor: scheme.surfaceContainerHighest,
-                child: Icon(Icons.person_outline, color: scheme.onSurfaceVariant),
+                outlineColor: scheme.outlineVariant,
+                textColor: scheme.onSurface,
+                theme: theme,
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
@@ -962,6 +1063,140 @@ class _ChatNotAvailable extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ChatParticipantInfo {
+  const _ChatParticipantInfo({required this.id, required this.name, required this.tipo});
+  final String id;
+  final String name;
+  final TipoParticipante tipo;
+}
+
+class _ChatParticipants {
+  static List<_ChatParticipantInfo> fromMessages({required List<Mensagem> messages, required String? currentUserId}) {
+    final byId = <String, _ChatParticipantInfo>{};
+
+    for (final m in messages) {
+      final id = m.senderId;
+      if (id.trim().isEmpty) continue;
+      if (byId.containsKey(id)) continue;
+      final name = m.senderNome.trim().isNotEmpty ? m.senderNome.trim() : m.senderTipo.displayName;
+      byId[id] = _ChatParticipantInfo(id: id, name: name, tipo: m.senderTipo);
+    }
+
+    final list = byId.values.toList();
+    // Prefer showing “others” first (group feel), then me.
+    list.sort((a, b) {
+      final aIsMe = currentUserId != null && a.id == currentUserId;
+      final bIsMe = currentUserId != null && b.id == currentUserId;
+      if (aIsMe != bIsMe) return aIsMe ? 1 : -1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return list;
+  }
+}
+
+class _ParticipantsAvatarStack extends StatelessWidget {
+  const _ParticipantsAvatarStack({
+    required this.participants,
+    required this.extraCount,
+    required this.backgroundColor,
+    required this.outlineColor,
+    required this.textColor,
+    required this.theme,
+  });
+
+  final List<_ChatParticipantInfo> participants;
+  final int extraCount;
+  final Color backgroundColor;
+  final Color outlineColor;
+  final Color textColor;
+  final ThemeData theme;
+
+  static Color _chipColor(ThemeData theme, TipoParticipante tipo) {
+    final scheme = theme.colorScheme;
+    return switch (tipo) {
+      TipoParticipante.embarcador => scheme.primary.withValues(alpha: 0.18),
+      TipoParticipante.transportadora => scheme.tertiary.withValues(alpha: 0.18),
+      TipoParticipante.motorista => scheme.secondary.withValues(alpha: 0.18),
+    };
+  }
+
+  static String _initials(String name) {
+    String firstChar(String s) {
+      final t = s.trim();
+      if (t.isEmpty) return '?';
+      return String.fromCharCode(t.runes.first);
+    }
+
+    final parts = name.split(RegExp(r'\s+')).where((p) => p.trim().isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    final a = firstChar(parts.first);
+    final b = parts.length > 1 ? firstChar(parts.last) : '';
+    return (a + b).toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (participants.isEmpty) {
+      return CircleAvatar(
+        radius: 18,
+        backgroundColor: backgroundColor,
+        child: Icon(Icons.forum_outlined, color: theme.colorScheme.onSurfaceVariant),
+      );
+    }
+
+    return SizedBox(
+      width: 44,
+      height: 36,
+      child: Stack(
+        children: [
+          for (int i = 0; i < participants.length; i++)
+            Positioned(
+              left: i * 14.0,
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: _chipColor(theme, participants[i].tipo),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: outlineColor.withValues(alpha: 0.6)),
+                ),
+                child: Center(
+                  child: Text(
+                    _initials(participants[i].name),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: textColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (extraCount > 0)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: outlineColor.withValues(alpha: 0.6)),
+                ),
+                child: Text(
+                  '+$extraCount',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
