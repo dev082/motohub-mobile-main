@@ -318,15 +318,18 @@ class AppProvider with ChangeNotifier {
       } else {
         await SecureStorageService.write(key, entregaId);
         // Busca status da entrega para definir estado de rastreamento
-        await _updateTrackingForEntrega(entregaId);
+        await _updateTrackingForEntrega();
       }
     } catch (e) {
       debugPrint('Persist activeEntregaId error: $e');
     }
   }
 
-  Future<void> _updateTrackingForEntrega(String entregaId) async {
+  Future<void> _updateTrackingForEntrega() async {
     try {
+      final entregaId = _activeEntregaId;
+      if (entregaId == null) return;
+
       final data = await SupabaseConfig.client.from('entregas').select('status').eq('id', entregaId).maybeSingle();
       if (data == null) return;
 
@@ -342,7 +345,7 @@ class AppProvider with ChangeNotifier {
         StatusEntrega.problema => TrackingState.emEntrega,
       };
 
-      await _trackingService.updateTrackingState(trackingState, entregaId: entregaId);
+      await _trackingService.updateTrackingState(trackingState);
     } catch (e) {
       debugPrint('Update tracking for entrega error: $e');
     }
@@ -531,12 +534,10 @@ class AppProvider with ChangeNotifier {
         );
 
         // Inicia rastreamento quando uma entrega é atribuída
-        if (motorista.email != null && motorista.email!.isNotEmpty) {
-          await _trackingService.startTracking(
-            emailMotorista: motorista.email!,
-            initialState: TrackingState.onlineSemEntrega,
-          );
-        }
+        await _trackingService.startTracking(
+          motoristaId: motorista.id,
+          initialState: TrackingState.onlineSemEntrega,
+        );
       } catch (e) {
         debugPrint('Entrega assignment realtime callback error: $e');
       }
@@ -675,12 +676,10 @@ class AppProvider with ChangeNotifier {
         await _startEntregaAssignmentRealtime();
         
         // Inicia rastreamento online
-        if (motorista.email != null && motorista.email!.isNotEmpty) {
-          await _trackingService.startTracking(
-            emailMotorista: motorista.email!,
-            initialState: TrackingState.onlineSemEntrega,
-          );
-        }
+        await _trackingService.startTracking(
+          motoristaId: motorista.id,
+          initialState: TrackingState.onlineSemEntrega,
+        );
       }
     } catch (e) {
       debugPrint('Load current motorista error: $e');

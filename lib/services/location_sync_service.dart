@@ -43,20 +43,22 @@ class LocationSyncService {
 
       debugPrint('[LocationSync] Sincronizando ${points.length} pontos...');
 
-      // Agrupa por email_motorista para fazer UPSERT
-      final Map<String, Map<String, dynamic>> byEmail = {};
+      // Agrupa por motorista_id para fazer UPSERT (mantém apenas o ponto mais recente)
+      final Map<String, Map<String, dynamic>> byMotorista = {};
       for (final point in points) {
-        // Sempre enviar o ponto mais recente por email
-        final existing = byEmail[point.emailMotorista];
-        if (existing == null || (point.timestamp.millisecondsSinceEpoch > (existing['timestamp'] as int))) {
-          byEmail[point.emailMotorista] = point.toSupabaseJson();
+        final existing = byMotorista[point.motoristaId];
+        if (existing == null || (point.timestamp.isAfter(DateTime.fromMillisecondsSinceEpoch(existing['_timestamp'] as int)))) {
+          final json = point.toSupabaseJson();
+          json['_timestamp'] = point.timestamp.millisecondsSinceEpoch; // helper para comparação
+          byMotorista[point.motoristaId] = json;
         }
       }
 
-      // UPSERT na tabela localizações (posição atual)
-      for (final data in byEmail.values) {
+      // UPSERT na tabela localizações (posição real-time atual)
+      for (final data in byMotorista.values) {
+        data.remove('_timestamp'); // remove helper antes de enviar
         try {
-          await SupabaseConfig.client.from('localizações').upsert(data, onConflict: 'email_motorista');
+          await SupabaseConfig.client.from('localizações').upsert(data, onConflict: 'motorista_id');
         } catch (e) {
           debugPrint('[LocationSync] Erro ao fazer UPSERT: $e');
           throw e;

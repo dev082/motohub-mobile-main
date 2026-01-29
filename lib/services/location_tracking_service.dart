@@ -16,29 +16,26 @@ class LocationTrackingService {
 
   StreamSubscription<Position>? _positionStream;
   TrackingState _currentState = TrackingState.offline;
-  String? _emailMotorista;
-  String? _currentEntregaId;
+  String? _motoristaId;
   Position? _lastPosition;
   bool _isTracking = false;
 
   TrackingState get currentState => _currentState;
   bool get isTracking => _isTracking;
 
-  static const String _keyEmailMotorista = 'tracking_email_motorista';
+  static const String _keyMotoristaId = 'tracking_motorista_id';
   static const String _keyTrackingState = 'tracking_state';
-  static const String _keyEntregaId = 'tracking_entrega_id';
 
   /// Inicializa o serviço e restaura estado salvo
   Future<void> initialize() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _emailMotorista = prefs.getString(_keyEmailMotorista);
+      _motoristaId = prefs.getString(_keyMotoristaId);
       final stateStr = prefs.getString(_keyTrackingState);
       _currentState = stateStr != null ? TrackingState.fromString(stateStr) : TrackingState.offline;
-      _currentEntregaId = prefs.getString(_keyEntregaId);
 
       // Se estava rastreando antes do app fechar, retoma
-      if (_currentState != TrackingState.offline && _emailMotorista != null) {
+      if (_currentState != TrackingState.offline && _motoristaId != null) {
         debugPrint('[LocationTracking] Retomando rastreamento: $_currentState');
         await _startTracking();
       }
@@ -49,24 +46,17 @@ class LocationTrackingService {
 
   /// Inicia o rastreamento para um motorista
   Future<void> startTracking({
-    required String emailMotorista,
+    required String motoristaId,
     required TrackingState initialState,
-    String? entregaId,
   }) async {
     try {
-      _emailMotorista = emailMotorista;
+      _motoristaId = motoristaId;
       _currentState = initialState;
-      _currentEntregaId = entregaId;
 
       // Persiste estado
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyEmailMotorista, emailMotorista);
+      await prefs.setString(_keyMotoristaId, motoristaId);
       await prefs.setString(_keyTrackingState, initialState.value);
-      if (entregaId != null) {
-        await prefs.setString(_keyEntregaId, entregaId);
-      } else {
-        await prefs.remove(_keyEntregaId);
-      }
 
       await _startTracking();
       LocationSyncService.instance.startPeriodicSync();
@@ -84,14 +74,12 @@ class LocationTrackingService {
       LocationSyncService.instance.stopPeriodicSync();
 
       _currentState = TrackingState.offline;
-      _emailMotorista = null;
-      _currentEntregaId = null;
+      _motoristaId = null;
       _lastPosition = null;
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_keyEmailMotorista);
+      await prefs.remove(_keyMotoristaId);
       await prefs.remove(_keyTrackingState);
-      await prefs.remove(_keyEntregaId);
 
       debugPrint('[LocationTracking] Rastreamento parado');
     } catch (e) {
@@ -100,19 +88,13 @@ class LocationTrackingService {
   }
 
   /// Atualiza o estado de rastreamento (muda precisão/intervalo)
-  Future<void> updateTrackingState(TrackingState newState, {String? entregaId}) async {
-    if (_currentState == newState && _currentEntregaId == entregaId) return;
+  Future<void> updateTrackingState(TrackingState newState) async {
+    if (_currentState == newState) return;
 
     _currentState = newState;
-    _currentEntregaId = entregaId;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyTrackingState, newState.value);
-    if (entregaId != null) {
-      await prefs.setString(_keyEntregaId, entregaId);
-    } else {
-      await prefs.remove(_keyEntregaId);
-    }
 
     // Reinicia o stream com nova configuração
     if (_isTracking) {
@@ -170,20 +152,19 @@ class LocationTrackingService {
   }
 
   void _onPositionUpdate(Position position) {
-    if (_emailMotorista == null) return;
+    if (_motoristaId == null) return;
 
     final heading = _calculateHeading(position);
     final point = LocationPoint(
       id: const Uuid().v4(),
-      emailMotorista: _emailMotorista!,
-      entregaId: _currentEntregaId,
+      motoristaId: _motoristaId!,
       latitude: position.latitude,
       longitude: position.longitude,
+      altitude: position.altitude,
       precisao: position.accuracy,
       velocidade: position.speed,
       heading: heading,
       timestamp: position.timestamp ?? DateTime.now(),
-      status: _currentState.value,
     );
 
     // Salva na fila local
