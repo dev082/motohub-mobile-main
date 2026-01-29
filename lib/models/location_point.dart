@@ -56,6 +56,7 @@ class LocationPoint {
 
   Map<String, dynamic> toSupabaseJson() => {
         'email_motorista': emailMotorista,
+        'entrega_id': entregaId,
         'latitude': latitude,
         'longitude': longitude,
         'precisao': precisao,
