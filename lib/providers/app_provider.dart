@@ -43,6 +43,10 @@ class AppProvider with ChangeNotifier {
 
   ThemeMode _themeMode = ThemeMode.system;
 
+  // UX: permite que a Home dispare uma busca e a aba Explorar já abra com texto preenchido.
+  // Como Explorar fica em IndexedStack, precisamos de um estado global simples.
+  String? _explorarPrefillQuery;
+
   String? _chatWallpaperUrl;
   double _chatWallpaperOpacity = 0.10;
   String? _chatWallpaperLoadedForUserId;
@@ -70,6 +74,19 @@ class AppProvider with ChangeNotifier {
   ThemeMode get themeMode => _themeMode;
   String? get chatWallpaperUrl => _chatWallpaperUrl;
   double get chatWallpaperOpacity => _chatWallpaperOpacity;
+
+  String? get explorarPrefillQuery => _explorarPrefillQuery;
+
+  /// Define uma busca para pré-preencher no Explorar.
+  ///
+  /// Observação: Explorar pode escolher limpar esse valor após consumir.
+  void setExplorarPrefillQuery(String? query) {
+    final normalized = query?.trim();
+    final next = (normalized == null || normalized.isEmpty) ? null : normalized;
+    if (next == _explorarPrefillQuery) return;
+    _explorarPrefillQuery = next;
+    notifyListeners();
+  }
 
   Future<void> _loadThemeMode() async {
     try {

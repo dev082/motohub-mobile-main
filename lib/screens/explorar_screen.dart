@@ -23,6 +23,7 @@ class ExplorarScreen extends StatefulWidget {
 class _ExplorarScreenState extends State<ExplorarScreen> {
   final CargaService _cargaService = CargaService();
   final TextEditingController _searchController = TextEditingController();
+  String? _lastAppliedPrefillQuery;
   
   List<Carga> _cargas = [];
   List<Carga> _filteredCargas = [];
@@ -33,6 +34,29 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
   void initState() {
     super.initState();
     _loadCargas();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _maybeApplyPrefillQuery();
+  }
+
+  void _maybeApplyPrefillQuery() {
+    final prefill = context.read<AppProvider>().explorarPrefillQuery;
+    if (prefill == null || prefill.trim().isEmpty) return;
+    if (prefill == _lastAppliedPrefillQuery) return;
+
+    _lastAppliedPrefillQuery = prefill;
+    if (_searchController.text.trim() != prefill.trim()) {
+      _searchController.text = prefill.trim();
+      _searchController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _searchController.text.length),
+      );
+    }
+    // Não limpamos automaticamente para permitir voltar para Home e manter estado.
+    // Se quiser, dá para limpar aqui depois.
+    _filterCargas();
   }
 
   @override
@@ -60,6 +84,9 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
         _filteredCargas = cargas;
         _isLoading = false;
       });
+
+      // Caso o prefill chegue antes/depois do load, reaplica.
+      if (mounted) _maybeApplyPrefillQuery();
     } catch (e) {
       debugPrint('ExplorarScreen: Error loading cargas: $e');
       setState(() => _isLoading = false);

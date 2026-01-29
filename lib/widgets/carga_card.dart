@@ -7,17 +7,19 @@ import 'package:intl/intl.dart';
 class CargaCard extends StatelessWidget {
   final Carga carga;
   final VoidCallback? onTap;
+  final EdgeInsetsGeometry? margin;
 
   const CargaCard({
     super.key,
     required this.carga,
     this.onTap,
+    this.margin,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      margin: margin ?? const EdgeInsets.only(bottom: AppSpacing.md),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.md),
