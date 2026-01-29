@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppSpacing {
   // Spacing values
@@ -456,73 +455,73 @@ ThemeData get darkTheme => ThemeData(
   textTheme: _buildTextTheme(Brightness.dark),
 );
 
-/// Build text theme using Inter font family
+/// Build text theme using system font
 TextTheme _buildTextTheme(Brightness brightness) {
   return TextTheme(
-    displayLarge: GoogleFonts.inter(
+    displayLarge: const TextStyle(
       fontSize: FontSizes.displayLarge,
       fontWeight: FontWeight.w400,
       letterSpacing: -0.25,
     ),
-    displayMedium: GoogleFonts.inter(
+    displayMedium: const TextStyle(
       fontSize: FontSizes.displayMedium,
       fontWeight: FontWeight.w400,
     ),
-    displaySmall: GoogleFonts.inter(
+    displaySmall: const TextStyle(
       fontSize: FontSizes.displaySmall,
       fontWeight: FontWeight.w400,
     ),
-    headlineLarge: GoogleFonts.inter(
+    headlineLarge: const TextStyle(
       fontSize: FontSizes.headlineLarge,
       fontWeight: FontWeight.w600,
       letterSpacing: -0.5,
     ),
-    headlineMedium: GoogleFonts.inter(
+    headlineMedium: const TextStyle(
       fontSize: FontSizes.headlineMedium,
       fontWeight: FontWeight.w600,
     ),
-    headlineSmall: GoogleFonts.inter(
+    headlineSmall: const TextStyle(
       fontSize: FontSizes.headlineSmall,
       fontWeight: FontWeight.w600,
     ),
-    titleLarge: GoogleFonts.inter(
+    titleLarge: const TextStyle(
       fontSize: FontSizes.titleLarge,
       fontWeight: FontWeight.w600,
     ),
-    titleMedium: GoogleFonts.inter(
+    titleMedium: const TextStyle(
       fontSize: FontSizes.titleMedium,
       fontWeight: FontWeight.w500,
     ),
-    titleSmall: GoogleFonts.inter(
+    titleSmall: const TextStyle(
       fontSize: FontSizes.titleSmall,
       fontWeight: FontWeight.w500,
     ),
-    labelLarge: GoogleFonts.inter(
+    labelLarge: const TextStyle(
       fontSize: FontSizes.labelLarge,
       fontWeight: FontWeight.w500,
       letterSpacing: 0.1,
     ),
-    labelMedium: GoogleFonts.inter(
+    labelMedium: const TextStyle(
       fontSize: FontSizes.labelMedium,
       fontWeight: FontWeight.w500,
       letterSpacing: 0.5,
     ),
-    labelSmall: GoogleFonts.inter(
+    labelSmall: const TextStyle(
       fontSize: FontSizes.labelSmall,
       fontWeight: FontWeight.w500,
       letterSpacing: 0.5,
     ),
-    bodyLarge: GoogleFonts.inter(
+    bodyLarge: const TextStyle(
       fontSize: FontSizes.bodyLarge,
       fontWeight: FontWeight.w400,
       letterSpacing: 0.15,
     ),
-    bodyMedium: GoogleFonts.inter(
+    bodyMedium: const TextStyle(
       fontSize: FontSizes.bodyMedium,
       fontWeight: FontWeight.w400,
       letterSpacing: 0.25,
     ),
-    bodySmall: GoogleFonts.inter(
+    bodySmall: const TextStyle(
       fontSize: FontSizes.bodySmall,
       fontWeight: FontWeight.w400,
       letterSpacing: 0.4,

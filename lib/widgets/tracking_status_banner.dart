@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:hubfrete/services/location_tracking_service.dart';
 import 'package:hubfrete/theme.dart';
 import 'package:hubfrete/widgets/tracking_permission_sheet.dart';
+import 'package:hubfrete/models/tracking_state.dart';
 
-/// Banner de “soft lock”: não bloqueia o app, mas deixa claro que rastreamento
+/// Banner de "soft lock": não bloqueia o app, mas deixa claro que rastreamento
 /// está desativado e orienta o motorista a habilitar.
 class TrackingStatusBanner extends StatelessWidget {
   const TrackingStatusBanner({super.key, this.compact = false});
@@ -13,8 +14,13 @@ class TrackingStatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Se o rastreamento já está ativo, não mostrar o banner
+    final trackingService = LocationTrackingService.instance;
+    final isTracking = trackingService.isTracking && trackingService.currentState != TrackingState.offline;
+    if (isTracking) return const SizedBox.shrink();
+
     return FutureBuilder<TrackingReadiness>(
-      future: LocationTrackingService.instance.getTrackingReadiness(),
+      future: trackingService.getTrackingReadiness(),
       builder: (context, snap) {
         final readiness = snap.data;
         if (readiness == null) return const SizedBox.shrink();
