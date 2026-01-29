@@ -17,6 +17,7 @@ import 'package:hubfrete/widgets/carga_card.dart';
 import 'package:hubfrete/widgets/tracking_status_banner.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:hubfrete/services/location_tracking_service.dart';
 
 /// Tela "Operação do Dia" - Home focada para o motorista
 class OperacaoDiaScreen extends StatefulWidget {
@@ -773,32 +774,7 @@ class InicioTopHeader extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Expanded(
-                                child: Text('Localização ativa',
-                                    style: theme.textTheme.bodyMedium
-                                        ?.copyWith(color: onBg))),
-                            Text('Atualizando',
-                                style: theme.textTheme.bodySmall
-                                    ?.copyWith(color: muted)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                  _LocationStatusRow(),
                   const SizedBox(height: AppSpacing.sm),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -1279,6 +1255,54 @@ class _DriverAvatar extends StatelessWidget {
               ),
             )
           : null,
+    );
+  }
+}
+
+class _LocationStatusRow extends StatelessWidget {
+  const _LocationStatusRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppProvider>();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final onBg = isDark ? DarkModeColors.darkOnHeader : LightModeColors.lightOnHeader;
+    final muted = isDark ? DarkModeColors.darkHeaderMuted : LightModeColors.lightHeaderMuted;
+    
+    final isActive = app.isLocationTrackingActive;
+    final dotColor = isActive ? theme.colorScheme.primary : theme.colorScheme.error;
+    final label = isActive ? 'Localização ativa' : 'Localização inativa';
+    final status = isActive ? 'Atualizando' : 'Desativado';
+
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: dotColor,
+            borderRadius: BorderRadius.circular(99),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: onBg),
+                ),
+              ),
+              Text(
+                status,
+                style: theme.textTheme.bodySmall?.copyWith(color: muted),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -675,11 +675,8 @@ class AppProvider with ChangeNotifier {
         await _startChatNotifications();
         await _startEntregaAssignmentRealtime();
         
-        // Inicia rastreamento online
-        await _trackingService.startTracking(
-          motoristaId: motorista.id,
-          initialState: TrackingState.onlineSemEntrega,
-        );
+        // Verifica se há entrega ativa antes de iniciar rastreamento
+        await _initializeTrackingForMotorista(motorista.id);
       }
     } catch (e) {
       debugPrint('Load current motorista error: $e');
@@ -758,5 +755,47 @@ class AppProvider with ChangeNotifier {
     if (_userAlerts.isEmpty) return;
     _userAlerts.removeAt(0);
     notifyListeners();
+  }
+
+  /// Inicializa o rastreamento baseado no estado atual do motorista
+  Future<void> _initializeTrackingForMotorista(String motoristaId) async {
+    try {
+      // Busca entregas ativas do motorista
+      final entregas = await _entregaService.getMotoristaEntregas(motoristaId, activeOnly: true);
+      
+      TrackingState initialState;
+      if (entregas.isEmpty) {
+        // Sem entregas ativas - apenas online
+        initialState = TrackingState.onlineSemEntrega;
+      } else {
+        // Tem entregas ativas - define estado baseado na primeira entrega
+        final primeiraEntrega = entregas.first;
+        initialState = switch (primeiraEntrega.status) {
+          StatusEntrega.aguardando => TrackingState.onlineSemEntrega,
+          StatusEntrega.saiuParaColeta => TrackingState.emRotaColeta,
+          StatusEntrega.saiuParaEntrega => TrackingState.emEntrega,
+          _ => TrackingState.onlineSemEntrega,
+        };
+        
+        // Se não tem entrega ativa selecionada, seleciona a primeira
+        if (_activeEntregaId == null || _activeEntregaId!.isEmpty) {
+          await setActiveEntregaId(primeiraEntrega.id);
+        }
+      }
+      
+      await _trackingService.startTracking(
+        motoristaId: motoristaId,
+        initialState: initialState,
+      );
+      
+      debugPrint('[AppProvider] Rastreamento iniciado: $initialState (entregas ativas: ${entregas.length})');
+    } catch (e) {
+      debugPrint('[AppProvider] Erro ao inicializar rastreamento: $e');
+      // Fallback: inicia com estado online sem entrega
+      await _trackingService.startTracking(
+        motoristaId: motoristaId,
+        initialState: TrackingState.onlineSemEntrega,
+      );
+    }
   }
 }

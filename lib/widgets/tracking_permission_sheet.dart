@@ -112,17 +112,25 @@ class _TrackingPermissionSheetState extends State<TrackingPermissionSheet> {
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
-                child: Text(
-                  'Ative o rastreamento para iniciar a operação',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Ative o rastreamento para iniciar a operação',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    if ((widget.reason ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.reason!.trim(),
+                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
           ),
-          if ((widget.reason ?? '').trim().isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text(widget.reason!.trim(), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          ],
           const SizedBox(height: AppSpacing.md),
 
           if (_isLoading)
@@ -179,22 +187,20 @@ class _TrackingPermissionSheetState extends State<TrackingPermissionSheet> {
             ],
           ],
 
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
+                child: OutlinedButton(
                   onPressed: _openSettings,
-                  icon: const Icon(Icons.settings_outlined),
-                  label: const Text('Abrir configurações'),
+                  child: const Text('Configurações'),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
-                child: FilledButton.icon(
+                child: FilledButton(
                   onPressed: canProceed ? () => context.pop(true) : _refresh,
-                  icon: Icon(canProceed ? Icons.check : Icons.refresh),
-                  label: Text(canProceed ? 'Continuar' : 'Verificar'),
+                  child: Text(canProceed ? 'Continuar' : 'Verificar'),
                 ),
               ),
             ],
@@ -286,13 +292,13 @@ class _RequirementTile extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
-          SizedBox(
-            height: 40,
-            child: FilledButton(
-              onPressed: onAction,
-              child: Text(actionLabel),
+          const SizedBox(width: AppSpacing.xs),
+          FilledButton(
+            onPressed: onAction,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
             ),
+            child: Text(actionLabel),
           ),
         ],
       ),

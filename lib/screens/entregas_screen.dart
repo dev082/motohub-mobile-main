@@ -13,6 +13,7 @@ import 'package:hubfrete/widgets/app_drawer.dart';
 import 'package:hubfrete/widgets/canhoto_upload_sheet.dart';
 import 'package:hubfrete/widgets/checklist_veiculo_sheet.dart';
 import 'package:hubfrete/widgets/tracking_permission_sheet.dart';
+import 'package:hubfrete/widgets/tracking_status_banner.dart';
 import 'package:hubfrete/widgets/entrega_card.dart';
 import 'package:hubfrete/widgets/entrega_details_sheet.dart';
 import 'package:hubfrete/widgets/pull_to_refresh.dart';
@@ -354,6 +355,8 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
         physics: const AlwaysScrollableScrollPhysics(),
         padding: AppSpacing.paddingMd,
         children: [
+          const TrackingStatusBanner(),
+          const SizedBox(height: AppSpacing.md),
           SizedBox(
             height: MediaQuery.sizeOf(context).height * 0.55,
             child: Center(
@@ -384,9 +387,17 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: AppSpacing.paddingMd,
-      itemCount: entregas.length,
+      itemCount: entregas.length + 1,
       itemBuilder: (context, index) {
-        final entrega = entregas[index];
+        // Primeiro item é o banner de rastreamento
+        if (index == 0) {
+          return const Padding(
+            padding: EdgeInsets.only(bottom: AppSpacing.sm),
+            child: TrackingStatusBanner(),
+          );
+        }
+        
+        final entrega = entregas[index - 1];
         final app = context.watch<AppProvider>();
         final isSelected = app.activeEntregaId == entrega.id;
         return EntregaCard(
