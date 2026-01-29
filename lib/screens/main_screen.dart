@@ -4,6 +4,8 @@ import 'package:hubfrete/nav.dart';
 import 'package:hubfrete/screens/operacao_dia_screen.dart';
 import 'package:hubfrete/screens/entregas_screen.dart';
 import 'package:hubfrete/screens/chat_list_screen.dart';
+import 'package:hubfrete/screens/explorar_screen.dart';
+import 'package:hubfrete/screens/perfil_screen.dart';
 import 'package:hubfrete/services/location_tracking_service.dart';
 import 'package:hubfrete/widgets/tracking_permission_blocker.dart';
 
@@ -11,7 +13,7 @@ import 'package:hubfrete/widgets/tracking_permission_blocker.dart';
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key, this.initialTab});
 
-  /// Optional query param (`/home?tab=operacao|entregas|chat`).
+  /// Optional query param (`/home?tab=inicio|explorar|entregas|chat|menu`).
   final String? initialTab;
 
   @override
@@ -25,8 +27,10 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = const [
     OperacaoDiaScreen(),
+    ExplorarScreen(),
     EntregasScreen(),
     ChatListScreen(),
+    PerfilScreen(),
   ];
 
   @override
@@ -69,14 +73,20 @@ class _MainScreenState extends State<MainScreen> {
 
   int? _indexFromTab(String? tab) {
     switch (tab) {
-      case 'operacao':
+      case 'operacao': // backward compat
+      case 'inicio':
       case null:
       case '':
         return 0;
-      case 'entregas':
+      case 'explorar':
         return 1;
-      case 'chat':
+      case 'entregas':
         return 2;
+      case 'chat':
+        return 3;
+      case 'menu':
+      case 'perfil':
+        return 4;
     }
     return null;
   }
@@ -84,13 +94,17 @@ class _MainScreenState extends State<MainScreen> {
   String _tabFromIndex(int index) {
     switch (index) {
       case 0:
-        return 'operacao';
+        return 'inicio';
       case 1:
-        return 'entregas';
+        return 'explorar';
       case 2:
+        return 'entregas';
+      case 3:
         return 'chat';
+      case 4:
+        return 'menu';
       default:
-        return 'operacao';
+        return 'inicio';
     }
   }
 
@@ -116,13 +130,15 @@ class _MainScreenState extends State<MainScreen> {
           context.go('${AppRoutes.home}?tab=${_tabFromIndex(index)}');
         },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Operação'),
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Início'),
+          NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore), label: 'Explorar'),
           NavigationDestination(
             icon: Icon(Icons.local_shipping_outlined),
             selectedIcon: Icon(Icons.local_shipping),
             label: 'Entregas',
           ),
           NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: 'Chat'),
+          NavigationDestination(icon: Icon(Icons.menu), selectedIcon: Icon(Icons.menu_open), label: 'Menu'),
         ],
       ),
     );

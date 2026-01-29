@@ -64,68 +64,40 @@ class _LoginScreenState extends State<LoginScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    scheme.primaryContainer,
-                    scheme.primary.withValues(alpha: 0.92),
-                    scheme.surface,
-                  ],
-                  stops: const [0.0, 0.55, 1.0],
-                ),
+      backgroundColor: scheme.surface,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: _entered ? 1 : 0),
+              duration: const Duration(milliseconds: 520),
+              curve: Curves.easeOutCubic,
+              builder: (context, t, child) => Transform.translate(
+                offset: Offset(0, (1 - t) * 18),
+                child: Opacity(opacity: t, child: child),
               ),
-            ),
-          ),
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                  vertical: AppSpacing.xl,
-                ),
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: _entered ? 1 : 0),
-                  duration: const Duration(milliseconds: 520),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, t, child) {
-                    return Transform.translate(
-                      offset: Offset(0, (1 - t) * 18),
-                      child: Opacity(opacity: t, child: child),
-                    );
-                  },
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _LoginBrandHeader(
-                          title: 'Hub Frete Driver',
-                          subtitle: 'Gerencie suas entregas',
-                        ),
-                        const SizedBox(height: AppSpacing.xl),
-                        _LoginCard(
-                          formKey: _formKey,
-                          emailController: _emailController,
-                          passwordController: _passwordController,
-                          obscurePassword: _obscurePassword,
-                          onToggleObscure: () => setState(
-                              () => _obscurePassword = !_obscurePassword),
-                          onSubmit: _handleLogin,
-                        ),
-                      ],
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _LoginBrandHeader(title: 'HubFrete', subtitle: 'Acesse sua conta para continuar'),
+                    const SizedBox(height: AppSpacing.xl),
+                    _LoginCard(
+                      formKey: _formKey,
+                      emailController: _emailController,
+                      passwordController: _passwordController,
+                      obscurePassword: _obscurePassword,
+                      onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+                      onSubmit: _handleLogin,
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -148,15 +120,15 @@ class _LoginBrandHeader extends StatelessWidget {
           height: 56,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            color: scheme.primary.withValues(alpha: 0.18),
-            border: Border.all(color: scheme.outline.withValues(alpha: 0.18)),
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.16)),
           ),
           child: Icon(Icons.local_shipping_rounded,
               color: scheme.primary, size: 28),
         ),
         const SizedBox(height: AppSpacing.lg),
         Text(
-          "HubFrete Motoristas",
+          title,
           textAlign: TextAlign.center,
           style: context.textStyles.headlineMedium
               ?.copyWith(color: onBg, fontWeight: FontWeight.w700),
@@ -199,8 +171,8 @@ class _LoginCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.xl),
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.22),
-        border: Border.all(color: scheme.outline.withValues(alpha: 0.22)),
+        color: scheme.surface,
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.16)),
       ),
       child: Form(
         key: formKey,

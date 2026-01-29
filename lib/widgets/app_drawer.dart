@@ -58,11 +58,20 @@ class AppDrawer extends StatelessWidget {
                 children: [
                   _DrawerItem(
                     icon: Icons.home_outlined,
-                    label: 'Operação do dia',
+                    label: 'Início',
                     selected: _isActive(AppRoutes.home) || activeRoute == null,
                     onTap: () {
                       context.pop();
-                      context.go('${AppRoutes.home}?tab=operacao');
+                      context.go('${AppRoutes.home}?tab=inicio');
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.explore_outlined,
+                    label: 'Explorar',
+                    selected: false,
+                    onTap: () {
+                      context.pop();
+                      context.go('${AppRoutes.home}?tab=explorar');
                     },
                   ),
                   _DrawerItem(
@@ -114,16 +123,7 @@ class AppDrawer extends StatelessWidget {
                     selected: _isActive(AppRoutes.perfil),
                     onTap: () {
                       context.pop();
-                      context.push(AppRoutes.perfil);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.explore_outlined,
-                    label: 'Explorar',
-                    selected: _isActive(AppRoutes.explorar),
-                    onTap: () {
-                      context.pop();
-                      context.push(AppRoutes.explorar);
+                      context.go('${AppRoutes.home}?tab=menu');
                     },
                   ),
 

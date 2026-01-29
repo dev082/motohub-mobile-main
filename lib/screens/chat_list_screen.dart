@@ -64,7 +64,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: AppDrawer(activeRoute: GoRouterState.of(context).matchedLocation),
       appBar: AppBar(
         title: const Text('Conversas'),
         actions: [

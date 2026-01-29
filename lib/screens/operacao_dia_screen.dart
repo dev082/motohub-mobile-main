@@ -71,7 +71,6 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
     final motorista = appProvider.currentMotorista;
 
     return Scaffold(
-      drawer: AppDrawer(activeRoute: GoRouterState.of(context).matchedLocation),
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

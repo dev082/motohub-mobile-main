@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hubfrete/models/motorista.dart';
 import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/nav.dart';
 import 'package:hubfrete/theme.dart';
-import 'package:hubfrete/widgets/app_drawer.dart';
 import 'package:hubfrete/widgets/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
 
@@ -21,23 +22,10 @@ class PerfilScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      drawer: AppDrawer(activeRoute: GoRouterState.of(context).matchedLocation),
       appBar: AppBar(
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-            tooltip: 'Menu',
-          ),
-        ),
-        title: const Text('Perfil'),
+        title: const Text('Menu'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _showLogoutDialog(context),
-          ),
-          if (context.canPop())
-            IconButton(onPressed: context.pop, icon: const Icon(Icons.close), tooltip: 'Fechar'),
+          IconButton(icon: const Icon(Icons.logout), onPressed: () => _showLogoutDialog(context)),
         ],
       ),
       body: PullToRefresh(
@@ -46,129 +34,32 @@ class PerfilScreen extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: AppSpacing.paddingLg,
           children: [
-            // Profile picture
-            Center(
-              child: Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                    backgroundImage: motorista.fotoUrl != null
-                        ? NetworkImage(motorista.fotoUrl!)
-                        : null,
-                    child: motorista.fotoUrl == null
-                        ? Icon(
-                            Icons.person,
-                            size: 60,
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
-                          )
-                        : null,
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: motorista.isAutonomo
-                            ? StatusColors.delivered
-                            : StatusColors.collected,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Theme.of(context).colorScheme.surface,
-                          width: 3,
-                        ),
-                      ),
-                      padding: const EdgeInsets.all(8),
-                      child: Icon(
-                        motorista.isAutonomo ? Icons.person : Icons.business,
-                        size: 20,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
+            _ProfileHeader(motoristaNome: motorista.nomeCompleto, isAutonomo: motorista.isAutonomo, fotoUrl: motorista.fotoUrl),
+            const SizedBox(height: AppSpacing.lg),
 
-            // Name and type
-            Text(
-              motorista.nomeCompleto,
-              style: context.textStyles.headlineSmall?.semiBold,
-              textAlign: TextAlign.center,
+            Text('Conta', style: context.textStyles.titleSmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.2)),
+            const SizedBox(height: AppSpacing.sm),
+            _MenuSection(
+              children: [
+                _MenuTile(icon: Icons.person_outline, title: 'Dados do motorista', subtitle: 'Email, telefone, documentos', onTap: () => _showDriverDetailsSheet(context, motorista)),
+                _MenuTile(icon: Icons.directions_car_outlined, title: 'Veículos', subtitle: 'Gerencie seus veículos', onTap: () => context.push(AppRoutes.veiculos)),
+                _MenuTile(icon: Icons.insights_outlined, title: 'Relatórios', subtitle: 'KPIs e histórico', onTap: () => context.push(AppRoutes.relatorios)),
+              ],
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.xs,
-              ),
-              decoration: BoxDecoration(
-                color: motorista.isAutonomo
-                    ? StatusColors.delivered.withValues(alpha: 0.1)
-                    : StatusColors.collected.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: Text(
-                motorista.isAutonomo ? 'Motorista Autônomo' : 'Motorista de Frota',
-                style: context.textStyles.labelLarge?.copyWith(
-                  color: motorista.isAutonomo ? StatusColors.delivered : StatusColors.collected,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
 
-            // Information cards
-            _buildInfoCard(
-              context,
-              icon: Icons.email_outlined,
-              title: 'Email',
-              value: motorista.email ?? 'Não informado',
-            ),
-            _buildInfoCard(
-              context,
-              icon: Icons.phone_outlined,
-              title: 'Telefone',
-              value: motorista.telefone ?? 'Não informado',
-            ),
-            _buildInfoCard(
-              context,
-              icon: Icons.badge_outlined,
-              title: 'CPF',
-              value: motorista.cpf,
-            ),
-            if (motorista.cnh != null)
-              _buildInfoCard(
-                context,
-                icon: Icons.credit_card_outlined,
-                title: 'CNH',
-                value: '${motorista.cnh} - ${motorista.categoriaCnh ?? ""}',
-              ),
-            if (motorista.uf != null)
-              _buildInfoCard(
-                context,
-                icon: Icons.location_city_outlined,
-                title: 'UF',
-                value: motorista.uf!,
-              ),
+            const SizedBox(height: AppSpacing.lg),
+            Text('Aparência', style: context.textStyles.titleSmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.2)),
+            const SizedBox(height: AppSpacing.sm),
+            const _ThemeModeCard(),
 
-            const SizedBox(height: AppSpacing.xxl),
-
-            // About section
-            Text(
-              'Hub Frete Driver App',
-              style: context.textStyles.titleMedium?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Versão 1.0.0',
-              style: context.textStyles.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            const SizedBox(height: AppSpacing.lg),
+            Text('Sobre', style: context.textStyles.titleSmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.2)),
+            const SizedBox(height: AppSpacing.sm),
+            _MenuSection(
+              children: [
+                _MenuTile(icon: Icons.local_shipping_outlined, title: 'Hub Frete Driver', subtitle: 'Versão 1.0.0', onTap: () {}),
+                _MenuTile(icon: Icons.logout, title: 'Sair', subtitle: 'Encerrar sessão', onTap: () => _showLogoutDialog(context), destructive: true),
+              ],
             ),
           ],
         ),
@@ -176,50 +67,43 @@ class PerfilScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String value,
-  }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Padding(
-        padding: AppSpacing.paddingMd,
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.sm),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-              ),
-              child: Icon(
-                icon,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: context.textStyles.labelMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+  static void _showDriverDetailsSheet(BuildContext context, Motorista motorista) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.lg + MediaQuery.viewInsetsOf(context).bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Dados do motorista', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: AppSpacing.md),
+                _InfoRow(label: 'Nome', value: motorista.nomeCompleto),
+                _InfoRow(label: 'Email', value: motorista.email ?? 'Não informado'),
+                _InfoRow(label: 'Telefone', value: motorista.telefone ?? 'Não informado'),
+                _InfoRow(label: 'CPF', value: motorista.cpf),
+                if (motorista.cnh != null) _InfoRow(label: 'CNH', value: '${motorista.cnh} - ${motorista.categoriaCnh ?? ""}'),
+                if (motorista.uf != null) _InfoRow(label: 'UF', value: motorista.uf!),
+                const SizedBox(height: AppSpacing.md),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton(
+                    onPressed: context.pop,
+                    style: FilledButton.styleFrom(backgroundColor: cs.primary, foregroundColor: cs.onPrimary),
+                    child: const Text('Fechar'),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    value,
-                    style: context.textStyles.bodyMedium?.semiBold,
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -245,6 +129,192 @@ class PerfilScreen extends StatelessWidget {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.motoristaNome, required this.isAutonomo, required this.fotoUrl});
+  final String motoristaNome;
+  final bool isAutonomo;
+  final String? fotoUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final badgeColor = isAutonomo ? StatusColors.delivered : StatusColors.collected;
+    return Container(
+      padding: AppSpacing.paddingMd,
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        children: [
+          Stack(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: cs.primaryContainer,
+                backgroundImage: fotoUrl != null ? NetworkImage(fotoUrl!) : null,
+                child: fotoUrl == null ? Icon(Icons.person, color: cs.onPrimaryContainer) : null,
+              ),
+              Positioned(
+                bottom: -1,
+                right: -1,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: badgeColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: cs.surface, width: 2),
+                  ),
+                  child: Icon(isAutonomo ? Icons.person : Icons.business, size: 12, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(motoristaNome, style: context.textStyles.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text(
+                  isAutonomo ? 'Motorista autônomo' : 'Motorista de frota',
+                  style: context.textStyles.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+        ],
+      ),
+    );
+  }
+}
+
+class _MenuSection extends StatelessWidget {
+  const _MenuSection({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.14)),
+      ),
+      child: Column(children: children),
+    );
+  }
+}
+
+class _MenuTile extends StatelessWidget {
+  const _MenuTile({required this.icon, required this.title, required this.subtitle, required this.onTap, this.destructive = false});
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final iconBg = destructive ? cs.errorContainer : cs.primaryContainer;
+    final iconFg = destructive ? cs.onErrorContainer : cs.onPrimaryContainer;
+    return Column(
+      children: [
+        ListTile(
+          onTap: onTap,
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: iconFg),
+          ),
+          title: Text(title, style: context.textStyles.bodyLarge?.copyWith(fontWeight: FontWeight.w700, color: destructive ? cs.error : cs.onSurface)),
+          subtitle: Text(subtitle, style: context.textStyles.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.4)),
+          trailing: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+        ),
+        Divider(height: 1, thickness: 1, color: cs.outline.withValues(alpha: 0.10)),
+      ],
+    );
+  }
+}
+
+class _ThemeModeCard extends StatelessWidget {
+  const _ThemeModeCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final app = context.watch<AppProvider>();
+    final mode = app.themeMode;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.dark_mode_outlined, color: cs.onSurfaceVariant),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: Text('Tema', style: context.textStyles.bodyLarge?.copyWith(fontWeight: FontWeight.w700))),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SegmentedButton<ThemeMode>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: ThemeMode.system, label: Text('Sistema')),
+              ButtonSegment(value: ThemeMode.light, label: Text('Claro')),
+              ButtonSegment(value: ThemeMode.dark, label: Text('Escuro')),
+            ],
+            selected: {mode},
+            onSelectionChanged: (value) {
+              if (value.isEmpty) return;
+              context.read<AppProvider>().setThemeMode(value.first);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(label, style: context.textStyles.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: Text(value, style: context.textStyles.bodyMedium?.copyWith(fontWeight: FontWeight.w600))),
         ],
       ),
     );

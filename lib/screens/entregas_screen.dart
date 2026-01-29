@@ -288,7 +288,6 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: AppDrawer(activeRoute: GoRouterState.of(context).matchedLocation),
       appBar: AppBar(
         title: const Text('Minhas Entregas'),
         actions: [

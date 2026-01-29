@@ -6,7 +6,6 @@ import 'package:hubfrete/providers/app_provider.dart';
 import 'package:hubfrete/services/carga_service.dart';
 import 'package:hubfrete/nav.dart';
 import 'package:hubfrete/theme.dart';
-import 'package:hubfrete/widgets/app_drawer.dart';
 import 'package:hubfrete/widgets/carga_card.dart';
 import 'package:hubfrete/widgets/pull_to_refresh.dart';
 import 'package:hubfrete/utils/app_error_reporter.dart';
@@ -87,33 +86,53 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final motorista = context.watch<AppProvider>().currentMotorista;
+    final isFrota = motorista?.isFrota ?? false;
+
     return Scaffold(
-      drawer: AppDrawer(activeRoute: GoRouterState.of(context).matchedLocation),
       appBar: AppBar(
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-            tooltip: 'Menu',
-          ),
-        ),
         title: const Text('Explorar Cargas'),
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),
-            onPressed: _showFilterDialog,
+            onPressed: isFrota ? null : _showFilterDialog,
           ),
-          if (context.canPop())
-            IconButton(onPressed: context.pop, icon: const Icon(Icons.close), tooltip: 'Fechar'),
         ],
       ),
       body: Column(
         children: [
+          if (isFrota)
+            Padding(
+              padding: AppSpacing.horizontalMd + const EdgeInsets.only(top: AppSpacing.sm),
+              child: Container(
+                padding: AppSpacing.paddingMd,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        'Você é motorista de frota. Por regra da operação, o Explorar não está disponível para você.',
+                        style: context.textStyles.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Search bar
           Padding(
             padding: AppSpacing.horizontalMd + AppSpacing.verticalSm,
             child: TextField(
               controller: _searchController,
+              enabled: !isFrota,
               onChanged: (_) => _filterCargas(),
               decoration: InputDecoration(
                 hintText: 'Buscar por código, descrição ou cidade...',
@@ -173,7 +192,7 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                               final carga = _filteredCargas[index];
                               return CargaCard(
                                 carga: carga,
-                                onTap: () => context.push(AppRoutes.cargaDetailsPath(carga.id)),
+                                onTap: isFrota ? null : () => context.push(AppRoutes.cargaDetailsPath(carga.id)),
                               );
                             },
                           ),
