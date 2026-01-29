@@ -3,6 +3,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hubfrete/models/veiculo.dart';
 import 'package:hubfrete/providers/app_provider.dart';
+import 'package:hubfrete/models/carroceria.dart';
+import 'package:hubfrete/services/carroceria_service.dart';
 import 'package:hubfrete/services/storage_upload_service.dart';
 import 'package:hubfrete/services/veiculo_service.dart';
 import 'package:hubfrete/theme.dart';
@@ -23,6 +25,7 @@ class VeiculoFormScreen extends StatefulWidget {
 class _VeiculoFormScreenState extends State<VeiculoFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final VeiculoService _veiculoService = VeiculoService();
+  final CarroceriaService _carroceriaService = CarroceriaService();
   final StorageUploadService _uploadService = const StorageUploadService();
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -41,10 +44,14 @@ class _VeiculoFormScreenState extends State<VeiculoFormScreen> {
   TipoVeiculo _selectedTipo = TipoVeiculo.truck;
   TipoCarroceria _selectedCarroceria = TipoCarroceria.aberta;
   TipoPropriedadeVeiculo _selectedTipoPropriedade = TipoPropriedadeVeiculo.pf;
+  bool _carroceriaIntegrada = false;
+  String? _carroceriaId;
   bool _rastreador = false;
   bool _seguroAtivo = false;
   bool _ativo = true;
   bool _isLoading = false;
+
+  List<Carroceria> _carrocerias = const [];
 
   List<XFile> _pickedFotos = [];
   PickedBinaryFile? _documentoVeiculo;
@@ -75,10 +82,32 @@ class _VeiculoFormScreenState extends State<VeiculoFormScreen> {
     if (veiculo != null) {
       _selectedTipo = veiculo.tipo;
       _selectedCarroceria = veiculo.carroceria;
+      _carroceriaIntegrada = veiculo.carroceriaIntegrada;
+      _carroceriaId = veiculo.carroceriaId;
       _rastreador = veiculo.rastreador;
       _seguroAtivo = veiculo.seguroAtivo;
       _ativo = veiculo.ativo;
       _selectedTipoPropriedade = veiculo.tipoPropriedade ?? TipoPropriedadeVeiculo.pf;
+    }
+
+    _loadCarrocerias();
+  }
+
+  Future<void> _loadCarrocerias() async {
+    final motorista = context.read<AppProvider>().currentMotorista;
+    if (motorista == null) return;
+    try {
+      final list = await _carroceriaService.getCarroceriasByMotorista(motorista.id);
+      if (!mounted) return;
+      setState(() {
+        _carrocerias = list;
+        if (_carroceriaIntegrada && (_carroceriaId == null || _carroceriaId!.isEmpty)) {
+          final firstActive = _carrocerias.where((c) => c.ativo).toList();
+          _carroceriaId = (firstActive.isNotEmpty ? firstActive.first.id : (_carrocerias.isNotEmpty ? _carrocerias.first.id : null));
+        }
+      });
+    } catch (e) {
+      debugPrint('Load carrocerias error: $e');
     }
   }
 
@@ -211,12 +240,15 @@ class _VeiculoFormScreenState extends State<VeiculoFormScreen> {
         'placa': _placaController.text.trim().toUpperCase(),
         'tipo': _selectedTipo.value,
         'carroceria': _selectedCarroceria.value,
+        'carroceria_integrada': _carroceriaIntegrada,
+        'carroceria_id': _carroceriaIntegrada ? _carroceriaId : null,
         'marca': _marcaController.text.trim().isEmpty ? null : _marcaController.text.trim(),
         'modelo': _modeloController.text.trim().isEmpty ? null : _modeloController.text.trim(),
         'ano': _anoController.text.trim().isEmpty ? null : int.tryParse(_anoController.text.trim()),
         'renavam': _renavamController.text.trim().isEmpty ? null : _renavamController.text.trim(),
-        'capacidade_kg': _capacidadeKgController.text.trim().isEmpty ? null : double.tryParse(_capacidadeKgController.text.trim()),
-        'capacidade_m3': _capacidadeM3Controller.text.trim().isEmpty ? null : double.tryParse(_capacidadeM3Controller.text.trim()),
+        // Capacidade é definida na carroceria (integrada ou avulsa).
+        'capacidade_kg': null,
+        'capacidade_m3': null,
         'antt_rntrc': _anttRntrcController.text.trim().isEmpty ? null : _anttRntrcController.text.trim(),
         'tipo_propriedade': _selectedTipoPropriedade.value,
         'uf': _ufController.text.trim().isEmpty ? null : _ufController.text.trim().toUpperCase(),
@@ -226,6 +258,13 @@ class _VeiculoFormScreenState extends State<VeiculoFormScreen> {
         'seguro_ativo': _seguroAtivo,
         'ativo': _ativo,
       };
+
+      if (_carroceriaIntegrada && (_carroceriaId == null || _carroceriaId!.isEmpty)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecione a carroceria integrada para este veículo.')));
+        }
+        return;
+      }
 
       final veiculo = _isEditMode
           ? await _veiculoService.updateVeiculo(widget.veiculo!.id, data)
@@ -365,6 +404,57 @@ class _VeiculoFormScreenState extends State<VeiculoFormScreen> {
               },
             ),
             const SizedBox(height: AppSpacing.md),
+
+            SwitchListTile.adaptive(
+              value: _carroceriaIntegrada,
+              onChanged: _isLoading
+                  ? null
+                  : (v) {
+                      setState(() {
+                        _carroceriaIntegrada = v;
+                        if (!v) _carroceriaId = null;
+                      });
+                      if (v) _loadCarrocerias();
+                    },
+              title: const Text('Carroceria integrada no veículo'),
+              subtitle: const Text('Quando ativado, você precisa vincular uma carroceria a este veículo.'),
+            ),
+
+            if (_carroceriaIntegrada) ...[
+              const SizedBox(height: AppSpacing.sm),
+              DropdownButtonFormField<String>(
+                value: _carroceriaId,
+                decoration: const InputDecoration(
+                  labelText: 'Carroceria integrada (obrigatória) *',
+                  border: OutlineInputBorder(),
+                ),
+                items: _carrocerias
+                    .where((c) => c.ativo)
+                    .map((c) => DropdownMenuItem(
+                          value: c.id,
+                          child: Text('${c.placa} • ${c.tipo}${c.capacidadeKg != null ? ' • ${c.capacidadeKg!.toStringAsFixed(0)}kg' : ''}'),
+                        ))
+                    .toList(),
+                onChanged: _isLoading ? null : (value) => setState(() => _carroceriaId = value),
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
+
+            Container(
+              width: double.infinity,
+              padding: AppSpacing.paddingMd,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.12)),
+              ),
+              child: Text(
+                'Capacidade (kg/m³) é definida na carroceria (integrada ou avulsa).',
+                style: context.textStyles.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+
             TextFormField(
               controller: _marcaController,
               decoration: const InputDecoration(
@@ -398,26 +488,6 @@ class _VeiculoFormScreenState extends State<VeiculoFormScreen> {
               controller: _renavamController,
               decoration: const InputDecoration(
                 labelText: 'RENAVAM',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _capacidadeKgController,
-              decoration: const InputDecoration(
-                labelText: 'Capacidade (kg)',
-                hintText: '10000',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _capacidadeM3Controller,
-              decoration: const InputDecoration(
-                labelText: 'Capacidade (m³)',
-                hintText: '30',
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,

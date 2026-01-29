@@ -74,10 +74,10 @@ serve(async (req) => {
       return jsonResponse(403, { error: "only_autonomo_can_accept" });
     }
 
-    // 2) Validate vehicle belongs to motorista and has capacity.
+    // 2) Validate vehicle belongs to motorista.
     const { data: veiculo, error: veiculoError } = await admin
       .from("veiculos")
-      .select("id, motorista_id, capacidade_kg")
+      .select("id, motorista_id, carroceria_integrada, carroceria_id")
       .eq("id", veiculoId)
       .maybeSingle();
 
@@ -86,25 +86,31 @@ serve(async (req) => {
     if (veiculo.motorista_id !== motorista.id) {
       return jsonResponse(403, { error: "veiculo_not_owned" });
     }
-    if (veiculo.capacidade_kg == null) {
-      return jsonResponse(400, { error: "veiculo_missing_capacidade_kg" });
-    }
-    if (pesoKg > veiculo.capacidade_kg) {
-      return jsonResponse(400, { error: "peso_exceeds_vehicle_capacity", available_kg: veiculo.capacidade_kg });
+
+    // 3) Resolve carroceria efetiva (capacidade vem SEMPRE da carroceria).
+    // - Se o veículo tiver carroceria integrada, usamos veiculo.carroceria_id
+    // - Caso contrário, usamos a carroceria escolhida no payload
+    const isIntegrada = veiculo.carroceria_integrada === true;
+    const effectiveCarroceriaId = isIntegrada ? (veiculo.carroceria_id ?? null) : carroceriaId;
+    if (!effectiveCarroceriaId) {
+      return jsonResponse(400, { error: "carroceria_required" });
     }
 
-    // 3) Validate carroceria if provided.
-    if (carroceriaId) {
-      const { data: carroceria, error: carroceriaError } = await admin
-        .from("carrocerias")
-        .select("id, motorista_id")
-        .eq("id", carroceriaId)
-        .maybeSingle();
-      if (carroceriaError) return jsonResponse(500, { error: "carroceria_query_failed", details: carroceriaError.message });
-      if (!carroceria) return jsonResponse(404, { error: "carroceria_not_found" });
-      if (carroceria.motorista_id !== motorista.id) {
-        return jsonResponse(403, { error: "carroceria_not_owned" });
-      }
+    const { data: carroceria, error: carroceriaError } = await admin
+      .from("carrocerias")
+      .select("id, motorista_id, capacidade_kg")
+      .eq("id", effectiveCarroceriaId)
+      .maybeSingle();
+    if (carroceriaError) return jsonResponse(500, { error: "carroceria_query_failed", details: carroceriaError.message });
+    if (!carroceria) return jsonResponse(404, { error: "carroceria_not_found" });
+    if (carroceria.motorista_id !== motorista.id) {
+      return jsonResponse(403, { error: "carroceria_not_owned" });
+    }
+    if (carroceria.capacidade_kg == null) {
+      return jsonResponse(400, { error: "carroceria_missing_capacidade_kg" });
+    }
+    if (pesoKg > carroceria.capacidade_kg) {
+      return jsonResponse(400, { error: "peso_exceeds_carroceria_capacity", available_kg: carroceria.capacidade_kg });
     }
 
     // 4) Load carga and check availability.
@@ -139,7 +145,7 @@ serve(async (req) => {
       p_motorista_id: motorista.id,
       p_carga_id: cargaId,
       p_veiculo_id: veiculoId,
-      p_carroceria_id: carroceriaId,
+      p_carroceria_id: effectiveCarroceriaId,
       p_peso_kg: pesoKg,
     });
 

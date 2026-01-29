@@ -93,8 +93,11 @@ class _CargaDetalhesScreenState extends State<CargaDetalhesScreen> {
           _selectedVeiculoId = (firstActive.isNotEmpty ? firstActive.first.id : (_veiculos.isNotEmpty ? _veiculos.first.id : null));
         }
 
-        // Default optional carroceria selection to "none".
-        _selectedCarroceriaId ??= '';
+        // Preselect first active trailer to reduce friction.
+        if (_selectedCarroceriaId == null || _selectedCarroceriaId!.isEmpty) {
+          final firstActiveTrailer = _carrocerias.where((c) => c.ativo).toList();
+          _selectedCarroceriaId = (firstActiveTrailer.isNotEmpty ? firstActiveTrailer.first.id : (_carrocerias.isNotEmpty ? _carrocerias.first.id : null));
+        }
       });
     } catch (e) {
       debugPrint('CargaDetalhesScreen: failed to load veiculos/carrocerias: $e');
@@ -123,12 +126,6 @@ class _CargaDetalhesScreenState extends State<CargaDetalhesScreen> {
       return;
     }
 
-    final peso = _parsePeso();
-    if (peso == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Informe quantos kg você quer levar.')));
-      return;
-    }
-
     Veiculo? veiculo;
     for (final v in _veiculos) {
       if (v.id == veiculoId) {
@@ -136,9 +133,46 @@ class _CargaDetalhesScreenState extends State<CargaDetalhesScreen> {
         break;
       }
     }
-    final capacidade = veiculo?.capacidadeKg;
-    if (capacidade != null && peso > capacidade) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Peso maior que a capacidade do veículo (${capacidade.toStringAsFixed(0)} kg).')));
+    if (veiculo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veículo inválido. Selecione novamente.')));
+      return;
+    }
+
+    final peso = _parsePeso();
+    if (peso == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Informe quantos kg você quer levar.')));
+      return;
+    }
+
+    // Regra: capacidade de peso vem da CARROCERIA.
+    final effectiveCarroceriaId = veiculo.carroceriaIntegrada ? veiculo.carroceriaId : (_selectedCarroceriaId == null || _selectedCarroceriaId!.isEmpty ? null : _selectedCarroceriaId);
+    if (effectiveCarroceriaId == null || effectiveCarroceriaId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            veiculo.carroceriaIntegrada
+                ? 'Este veículo está marcado como carroceria integrada, mas não possui carroceria vinculada. Cadastre/vincule a carroceria antes de aceitar.'
+                : 'Selecione uma carroceria para aceitar a carga.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    Carroceria? carroceria;
+    for (final c in _carrocerias) {
+      if (c.id == effectiveCarroceriaId) {
+        carroceria = c;
+        break;
+      }
+    }
+    final capacidade = carroceria?.capacidadeKg;
+    if (capacidade == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('A carroceria selecionada precisa ter capacidade (kg) cadastrada.')));
+      return;
+    }
+    if (peso > capacidade) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Peso maior que a capacidade da carroceria (${capacidade.toStringAsFixed(0)} kg).')));
       return;
     }
 
@@ -158,7 +192,7 @@ class _CargaDetalhesScreenState extends State<CargaDetalhesScreen> {
       final entrega = await _entregaService.acceptCargaAutomatico(
         cargaId: carga.id,
         veiculoId: veiculoId,
-        carroceriaId: (_selectedCarroceriaId == null || _selectedCarroceriaId!.isEmpty) ? null : _selectedCarroceriaId,
+        carroceriaId: effectiveCarroceriaId,
         pesoKg: peso,
       );
 
@@ -325,6 +359,28 @@ class _AceiteCard extends StatelessWidget {
     final activeVehicles = veiculos.where((v) => v.ativo).toList(growable: false);
     final activeCarrocerias = carrocerias.where((c) => c.ativo).toList(growable: false);
 
+    Veiculo? selectedVeiculo;
+    if (selectedVeiculoId != null && selectedVeiculoId!.isNotEmpty) {
+      for (final v in activeVehicles) {
+        if (v.id == selectedVeiculoId) {
+          selectedVeiculo = v;
+          break;
+        }
+      }
+    }
+
+    final usesIntegrada = selectedVeiculo?.carroceriaIntegrada == true;
+    final effectiveCarroceriaId = usesIntegrada ? selectedVeiculo?.carroceriaId : (selectedCarroceriaId == null || selectedCarroceriaId!.isEmpty ? null : selectedCarroceriaId);
+    Carroceria? effectiveCarroceria;
+    if (effectiveCarroceriaId != null) {
+      for (final c in activeCarrocerias) {
+        if (c.id == effectiveCarroceriaId) {
+          effectiveCarroceria = c;
+          break;
+        }
+      }
+    }
+
     if (!allowsAccept) {
       return Container(
         padding: AppSpacing.paddingMd,
@@ -372,7 +428,7 @@ class _AceiteCard extends StatelessWidget {
               for (final v in activeVehicles)
                 DropdownMenuItem(
                   value: v.id,
-                  child: Text('${v.placa} • ${v.tipo.label}${v.capacidadeKg != null ? ' • ${v.capacidadeKg!.toStringAsFixed(0)}kg' : ''}'),
+                  child: Text('${v.placa} • ${v.tipo.label}${v.carroceriaIntegrada ? ' • carroceria integrada' : ''}'),
                 ),
             ],
             onChanged: (accepting || activeVehicles.isEmpty) ? null : onVeiculoChanged,
@@ -380,19 +436,44 @@ class _AceiteCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
 
-          DropdownButtonFormField<String>(
-            value: selectedCarroceriaId,
-            items: [
-              const DropdownMenuItem(value: '', child: Text('Sem carroceria')),
-              for (final c in activeCarrocerias)
-                DropdownMenuItem(
-                  value: c.id,
-                  child: Text('${c.placa} • ${c.tipo}${c.capacidadeKg != null ? ' • ${c.capacidadeKg!.toStringAsFixed(0)}kg' : ''}'),
-                ),
-            ],
-            onChanged: accepting ? null : onCarroceriaChanged,
-            decoration: const InputDecoration(labelText: 'Carroceria (opcional)'),
-          ),
+          if (usesIntegrada) ...[
+            Container(
+              width: double.infinity,
+              padding: AppSpacing.paddingMd,
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: cs.outline.withValues(alpha: 0.12)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.link, color: cs.onSurfaceVariant),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      effectiveCarroceria == null
+                          ? 'Carroceria integrada não vinculada ao veículo.'
+                          : 'Carroceria integrada: ${effectiveCarroceria.placa} • ${effectiveCarroceria.tipo}${effectiveCarroceria.capacidadeKg != null ? ' • ${effectiveCarroceria.capacidadeKg!.toStringAsFixed(0)}kg' : ''}',
+                      style: context.textStyles.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            DropdownButtonFormField<String>(
+              value: selectedCarroceriaId,
+              items: [
+                for (final c in activeCarrocerias)
+                  DropdownMenuItem(
+                    value: c.id,
+                    child: Text('${c.placa} • ${c.tipo}${c.capacidadeKg != null ? ' • ${c.capacidadeKg!.toStringAsFixed(0)}kg' : ''}'),
+                  ),
+              ],
+              onChanged: (accepting || activeCarrocerias.isEmpty) ? null : onCarroceriaChanged,
+              decoration: const InputDecoration(labelText: 'Carroceria (obrigatória)'),
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
 
           TextFormField(

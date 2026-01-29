@@ -5,6 +5,10 @@ class Veiculo {
   final String placa;
   final TipoVeiculo tipo;
   final TipoCarroceria carroceria;
+  /// Quando true, a carroceria é parte do veículo e deve estar referenciada em `carroceriaId`.
+  final bool carroceriaIntegrada;
+  /// Carroceria vinculada ao veículo quando `carroceriaIntegrada == true`.
+  final String? carroceriaId;
   final double? capacidadeKg;
   final double? capacidadeM3;
   final int? ano;
@@ -33,6 +37,8 @@ class Veiculo {
     required this.placa,
     required this.tipo,
     required this.carroceria,
+    this.carroceriaIntegrada = false,
+    this.carroceriaId,
     this.capacidadeKg,
     this.capacidadeM3,
     this.ano,
@@ -63,6 +69,8 @@ class Veiculo {
       placa: json['placa'] as String,
       tipo: TipoVeiculo.fromString(json['tipo'] as String),
       carroceria: TipoCarroceria.fromString(json['carroceria'] as String),
+      carroceriaIntegrada: json['carroceria_integrada'] as bool? ?? false,
+      carroceriaId: json['carroceria_id'] as String?,
       capacidadeKg: json['capacidade_kg'] != null ? (json['capacidade_kg'] as num).toDouble() : null,
       capacidadeM3: json['capacidade_m3'] != null ? (json['capacidade_m3'] as num).toDouble() : null,
       ano: json['ano'] as int?,
@@ -95,6 +103,8 @@ class Veiculo {
         'placa': placa,
         'tipo': tipo.value,
         'carroceria': carroceria.value,
+        'carroceria_integrada': carroceriaIntegrada,
+        'carroceria_id': carroceriaId,
         'capacidade_kg': capacidadeKg,
         'capacidade_m3': capacidadeM3,
         'ano': ano,
@@ -124,6 +134,8 @@ class Veiculo {
     String? placa,
     TipoVeiculo? tipo,
     TipoCarroceria? carroceria,
+    bool? carroceriaIntegrada,
+    String? carroceriaId,
     double? capacidadeKg,
     double? capacidadeM3,
     int? ano,
@@ -152,6 +164,8 @@ class Veiculo {
         placa: placa ?? this.placa,
         tipo: tipo ?? this.tipo,
         carroceria: carroceria ?? this.carroceria,
+        carroceriaIntegrada: carroceriaIntegrada ?? this.carroceriaIntegrada,
+        carroceriaId: carroceriaId ?? this.carroceriaId,
         capacidadeKg: capacidadeKg ?? this.capacidadeKg,
         capacidadeM3: capacidadeM3 ?? this.capacidadeM3,
         ano: ano ?? this.ano,
