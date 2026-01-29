@@ -35,6 +35,8 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
 
   static const double _saldoMock = 0.79;
 
+  bool _isSaldoVisible = true;
+
   List<Entrega> _entregasAtuais = [];
   List<DocumentoValidacao> _documentosAlerta = [];
   List<Carga> _cargasProximas = [];
@@ -102,6 +104,13 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
     context.go('${AppRoutes.home}?tab=explorar');
   }
 
+  void _openFinanceiro() {
+    // Ainda não existe a aba Financeiro. Mantemos um placeholder amigável.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Financeiro em breve.')),
+    );
+  }
+
   Future<void> _loadDados() async {
     setState(() => _isLoading = true);
     try {
@@ -153,6 +162,9 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
                 motoristaNome: motorista?.nomeCompleto,
                 motoristaFotoUrl: motorista?.fotoUrl,
                 saldo: _saldoMock,
+                isSaldoVisible: _isSaldoVisible,
+                onToggleSaldoVisibility: () => setState(() => _isSaldoVisible = !_isSaldoVisible),
+                onTapCarteira: _openFinanceiro,
                 onTapExplorar: () => context.go('${AppRoutes.home}?tab=explorar'),
                 searchController: _searchController,
                 origemLabel: _origemLabel,
@@ -162,32 +174,33 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
             SliverPadding(
               padding: EdgeInsets.fromLTRB(
                 AppSpacing.md,
-                AppSpacing.md,
+                AppSpacing.sm,
                 AppSpacing.md,
                 AppSpacing.lg + MediaQuery.paddingOf(context).bottom,
               ),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
+                  if (!_isLoading && _documentosAlerta.isNotEmpty) _buildAlertasDocumentos(),
+                  const SizedBox(height: AppSpacing.md),
+                  InicioSectionHeader(
+                    title: 'Cargas próximas',
+                    trailing: 'Ver mais',
+                    onTrailingTap: () => context.go('${AppRoutes.home}?tab=explorar'),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  InicioCargasProximasCard(
+                    cargas: _cargasProximas,
+                    isLoading: _isLoading,
+                    onTapExplorar: () => context.go('${AppRoutes.home}?tab=explorar'),
+                    onTapCarga: (carga) => context.push(AppRoutes.cargaDetailsPath(carga.id)),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
                   if (_isLoading)
                     const Padding(
-                      padding: EdgeInsets.only(top: AppSpacing.lg),
+                      padding: EdgeInsets.only(top: AppSpacing.sm),
                       child: Center(child: CircularProgressIndicator()),
                     )
                   else ...[
-                    if (_documentosAlerta.isNotEmpty) _buildAlertasDocumentos(),
-                    const SizedBox(height: AppSpacing.lg),
-                    InicioSectionHeader(
-                      title: 'Cargas próximas',
-                      trailing: 'Ver mais',
-                      onTrailingTap: () => context.go('${AppRoutes.home}?tab=explorar'),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    InicioCargasProximasCard(
-                      cargas: _cargasProximas,
-                      onTapExplorar: () => context.go('${AppRoutes.home}?tab=explorar'),
-                      onTapCarga: (carga) => context.push(AppRoutes.cargaDetailsPath(carga.id)),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
                     _buildEntregasAtuais(),
                     const SizedBox(height: AppSpacing.lg),
                     _buildAtalhos(),
@@ -530,6 +543,9 @@ class InicioTopHeader extends StatelessWidget {
     required this.motoristaNome,
     required this.motoristaFotoUrl,
     required this.saldo,
+    required this.isSaldoVisible,
+    required this.onToggleSaldoVisibility,
+    required this.onTapCarteira,
     required this.onTapExplorar,
     required this.searchController,
     required this.onSearchSubmitted,
@@ -539,6 +555,9 @@ class InicioTopHeader extends StatelessWidget {
   final String? motoristaNome;
   final String? motoristaFotoUrl;
   final double saldo;
+  final bool isSaldoVisible;
+  final VoidCallback onToggleSaldoVisibility;
+  final VoidCallback onTapCarteira;
   final VoidCallback onTapExplorar;
   final TextEditingController searchController;
   final String? origemLabel;
@@ -593,26 +612,50 @@ class InicioTopHeader extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('R\$ ${saldo.toStringAsFixed(2)}', style: theme.textTheme.headlineSmall?.copyWith(color: onBg, fontWeight: FontWeight.w800)),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    isSaldoVisible ? 'R\$ ${saldo.toStringAsFixed(2)}' : 'R\$ •••',
+                                    style: theme.textTheme.headlineSmall?.copyWith(color: onBg, fontWeight: FontWeight.w800),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.xs),
+                                IconButton(
+                                  onPressed: onToggleSaldoVisibility,
+                                  icon: Icon(
+                                    isSaldoVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                    color: muted,
+                                  ),
+                                  tooltip: isSaldoVisible ? 'Ocultar saldo' : 'Mostrar saldo',
+                                  style: IconButton.styleFrom(
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    padding: const EdgeInsets.all(8),
+                                  ),
+                                ),
+                              ],
+                            ),
                             const SizedBox(height: 6),
                             Text('Saldo', style: theme.textTheme.bodySmall?.copyWith(color: muted)),
                           ],
                         ),
                       ),
                       TextButton.icon(
-                        onPressed: () {},
+                        onPressed: onTapCarteira,
                         style: TextButton.styleFrom(
                           foregroundColor: onBg,
                           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
                         ),
-                        icon: Icon(Icons.account_balance_wallet_outlined, size: 18, color: onBg),
+                        icon: Icon(Icons.north_east, size: 18, color: onBg),
                         label: const Text('Minha carteira'),
                       ),
                     ],
@@ -670,7 +713,7 @@ class InicioTopHeader extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: AppSpacing.xs),
+        const SizedBox(height: 2),
       ],
     );
   }
@@ -756,17 +799,33 @@ class InicioCargasProximasCard extends StatelessWidget {
   const InicioCargasProximasCard({
     super.key,
     required this.cargas,
+    required this.isLoading,
     required this.onTapExplorar,
     required this.onTapCarga,
   });
 
   final List<Carga> cargas;
+  final bool isLoading;
   final VoidCallback onTapExplorar;
   final ValueChanged<Carga> onTapCarga;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    if (isLoading) {
+      return SizedBox(
+        height: 232,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          itemCount: 3,
+          separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+          itemBuilder: (context, index) => const _CargaCardSkeleton(width: 320),
+        ),
+      );
+    }
+
     if (cargas.isEmpty) {
       return Card(
         child: Padding(
@@ -792,16 +851,128 @@ class InicioCargasProximasCard extends StatelessWidget {
       );
     }
 
-    // Mesmo layout do Explorar (vertical), só com poucos itens na Home.
-    return Column(
-      children: [
-        for (final c in cargas)
-          CargaCard(
-            carga: c,
-            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-            onTap: () => onTapCarga(c),
+    // Mesmo card do Explorar, mas em rolagem horizontal na Home.
+    return SizedBox(
+      height: 232,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: cargas.length,
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+        itemBuilder: (context, index) {
+          final c = cargas[index];
+          return SizedBox(
+            width: 320,
+            child: CargaCard(
+              carga: c,
+              margin: EdgeInsets.zero,
+              onTap: () => onTapCarga(c),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CargaCardSkeleton extends StatefulWidget {
+  const _CargaCardSkeleton({this.width});
+  final double? width;
+
+  @override
+  State<_CargaCardSkeleton> createState() => _CargaCardSkeletonState();
+}
+
+class _CargaCardSkeletonState extends State<_CargaCardSkeleton> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
+    _t = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final base = theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45);
+    final highlight = theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.20);
+
+    return SizedBox(
+      width: widget.width,
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: AppSpacing.paddingMd,
+          child: AnimatedBuilder(
+            animation: _t,
+            builder: (context, _) {
+              final color = Color.lerp(base, highlight, _t.value)!;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _SkelBox(width: 68, height: 20, color: color),
+                      const SizedBox(width: AppSpacing.sm),
+                      _SkelBox(width: 86, height: 20, color: color),
+                      const Spacer(),
+                      _SkelBox(width: 72, height: 18, color: color),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _SkelBox(width: double.infinity, height: 14, color: color),
+                  const SizedBox(height: 8),
+                  _SkelBox(width: 220, height: 14, color: color),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      Expanded(child: _SkelBox(width: double.infinity, height: 40, color: color)),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(child: _SkelBox(width: double.infinity, height: 40, color: color)),
+                    ],
+                  ),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      _SkelBox(width: 86, height: 14, color: color),
+                      const SizedBox(width: AppSpacing.md),
+                      _SkelBox(width: 108, height: 14, color: color),
+                    ],
+                  ),
+                ],
+              );
+            },
           ),
-      ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SkelBox extends StatelessWidget {
+  const _SkelBox({required this.width, required this.height, required this.color});
+  final double width;
+  final double height;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width == double.infinity ? null : width,
+      height: height,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
     );
   }
 }
