@@ -8,7 +8,6 @@ import 'package:hubfrete/providers/app_provider.dart';
 import 'package:hubfrete/services/entrega_service.dart';
 import 'package:hubfrete/services/documento_validacao_service.dart';
 import 'package:hubfrete/theme.dart';
-import 'package:hubfrete/widgets/app_drawer.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -23,6 +22,8 @@ class OperacaoDiaScreen extends StatefulWidget {
 class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
   final _entregaService = EntregaService();
   final _documentoService = DocumentoValidacaoService();
+
+  static const double _saldoMock = 0.79;
 
   Entrega? _entregaAtual;
   List<Entrega> _proximasEntregas = [];
@@ -60,55 +61,64 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('Falha ao carregar dados da tela Início: $e');
       setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final appProvider = context.watch<AppProvider>();
     final motorista = appProvider.currentMotorista;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Operação do Dia', style: theme.textTheme.titleLarge),
-            if (motorista != null)
-                Text(motorista.nomeCompleto, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          ],
-        ),
-        actions: [
-          // Botão de rastreio removido (sistema será refeito do zero).
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadDados,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+      body: RefreshIndicator(
+        onRefresh: _loadDados,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: InicioTopHeader(
+                motoristaNome: motorista?.nomeCompleto,
+                motoristaFotoUrl: motorista?.fotoUrl,
+                saldo: _saldoMock,
+                onTapExplorar: () => context.go('${AppRoutes.home}?tab=explorar'),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xxl),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  if (_isLoading)
+                    const Padding(
+                      padding: EdgeInsets.only(top: AppSpacing.lg),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else ...[
                     if (_documentosAlerta.isNotEmpty) _buildAlertasDocumentos(),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
+                    const InicioSectionHeader(title: 'Vistos recentemente', trailing: 'Ver todos'),
+                    const SizedBox(height: AppSpacing.sm),
+                    InicioRecentCard(entregaAtual: _entregaAtual),
+                    const SizedBox(height: AppSpacing.lg),
                     if (_entregaAtual != null) ...[
                       _buildEntregaAtual(),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: AppSpacing.lg),
                     ] else
                       _buildSemEntregasAtivas(),
                     if (_proximasEntregas.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.lg),
                       _buildProximasEntregas(),
-                      const SizedBox(height: 24),
                     ],
+                    const SizedBox(height: AppSpacing.lg),
                     _buildAtalhos(),
                   ],
-                ),
+                ]),
               ),
             ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -293,13 +303,11 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                // TODO: Navegar para Explorar
-              },
+            FilledButton.icon(
+              onPressed: () => context.go('${AppRoutes.home}?tab=explorar'),
               icon: const Icon(Icons.search),
-              label: const Text('Explorar Cargas'),
-            ),
+              label: const Text('Explorar cargas'),
+            )
           ],
         ),
       ),
@@ -322,7 +330,7 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
                 trailing: Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
                 onTap: () => context.push(AppRoutes.entregaMapaPath(e.id)),
                 tileColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
               ),
             )),
       ],
@@ -468,4 +476,311 @@ class _OperacaoDiaScreenState extends State<OperacaoDiaScreen> {
   }
 
   // _toggleTracking removido.
+}
+
+class InicioTopHeader extends StatelessWidget {
+  const InicioTopHeader({
+    super.key,
+    required this.motoristaNome,
+    required this.motoristaFotoUrl,
+    required this.saldo,
+    required this.onTapExplorar,
+  });
+
+  final String? motoristaNome;
+  final String? motoristaFotoUrl;
+  final double saldo;
+  final VoidCallback onTapExplorar;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bg = isDark ? DarkModeColors.darkHeader : LightModeColors.lightHeader;
+    final onBg = isDark ? DarkModeColors.darkOnHeader : LightModeColors.lightOnHeader;
+    final muted = isDark ? DarkModeColors.darkHeaderMuted : LightModeColors.lightHeaderMuted;
+
+    final displayName = (motoristaNome?.trim().isNotEmpty ?? false) ? motoristaNome!.trim() : 'Motorista';
+
+    return SizedBox(
+      height: 280,
+      child: Stack(
+        children: [
+          Container(
+            height: 232,
+            color: bg,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _DriverAvatar(url: motoristaFotoUrl, size: 42),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(displayName, style: theme.textTheme.titleMedium?.copyWith(color: onBg, fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Icon(Icons.verified_outlined, size: 16, color: muted),
+                                  const SizedBox(width: 6),
+                                  Text('Motorista VIP', style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        _HeaderIconButton(icon: Icons.group_outlined, color: onBg, onPressed: () {}),
+                        const SizedBox(width: AppSpacing.xs),
+                        _HeaderIconButton(icon: Icons.notifications_none, color: onBg, onPressed: () {}),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('R\$ ${saldo.toStringAsFixed(2)}', style: theme.textTheme.headlineSmall?.copyWith(color: onBg, fontWeight: FontWeight.w800)),
+                              const SizedBox(height: 6),
+                              Text('Saldo', style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                            ],
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () {},
+                          style: TextButton.styleFrom(
+                            foregroundColor: onBg,
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
+                          ),
+                          icon: Icon(Icons.account_balance_wallet_outlined, size: 18, color: onBg),
+                          label: const Text('Minha carteira'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text('Disponível para fretes', style: theme.textTheme.bodyMedium?.copyWith(color: onBg)),
+                              ),
+                              Text('Expira em 24h', style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: onTapExplorar,
+                        icon: Icon(Icons.explore_outlined, size: 18, color: onBg),
+                        label: Text('Explorar cargas', style: TextStyle(color: onBg, fontWeight: FontWeight.w700)),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: onBg.withValues(alpha: 0.25)),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            bottom: 0,
+            child: InicioSearchCard(
+              onTap: onTapExplorar,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class InicioSearchCard extends StatelessWidget {
+  const InicioSearchCard({super.key, required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surface,
+      borderRadius: BorderRadius.circular(AppRadius.xl),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.14)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.location_on_outlined, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Origem: Marília, SP',
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class InicioSectionHeader extends StatelessWidget {
+  const InicioSectionHeader({super.key, required this.title, this.trailing});
+  final String title;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Expanded(child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
+        if (trailing != null)
+          TextButton(
+            onPressed: () {},
+            child: Text(trailing!, style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+          ),
+      ],
+    );
+  }
+}
+
+class InicioRecentCard extends StatelessWidget {
+  const InicioRecentCard({super.key, required this.entregaAtual});
+  final Entrega? entregaAtual;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final carga = entregaAtual?.carga;
+    final origem = carga?.origem?.cidade;
+    final ufOrigem = carga?.origem?.estado;
+    final destino = carga?.destino?.cidade;
+    final ufDestino = carga?.destino?.estado;
+
+    final route = (origem != null && destino != null)
+        ? '${origem}${ufOrigem != null ? ', $ufOrigem' : ''}  →  ${destino}${ufDestino != null ? ', $ufDestino' : ''}'
+        : 'Bauru, SP  →  Uberlândia, MG';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(route, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800))),
+                Text('DIVERSOS', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Text('R\$ 1.800,00', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () {},
+                  icon: Icon(Icons.arrow_forward, size: 18, color: theme.colorScheme.primary),
+                  label: Text('Ver', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w800)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({required this.icon, required this.color, required this.onPressed});
+  final IconData icon;
+  final Color color;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon, color: color),
+      style: IconButton.styleFrom(
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.all(10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
+        backgroundColor: Colors.transparent,
+      ),
+    );
+  }
+}
+
+class _DriverAvatar extends StatelessWidget {
+  const _DriverAvatar({required this.url, required this.size});
+  final String? url;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasUrl = url != null && url!.trim().isNotEmpty;
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(size),
+        color: theme.colorScheme.surface.withValues(alpha: 0.12),
+        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.35), width: 1),
+        image: hasUrl ? DecorationImage(image: NetworkImage(url!.trim()), fit: BoxFit.cover) : null,
+      ),
+      child: !hasUrl
+          ? Center(
+              child: Icon(
+                Icons.person,
+                size: size * 0.62,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            )
+          : null,
+    );
+  }
 }

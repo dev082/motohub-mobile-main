@@ -114,6 +114,11 @@ class LightModeColors {
   static const lightSurfaceVariant = Color(0xFFE2E8F0);
   static const lightOnSurfaceVariant = Color(0xFF44474E);
 
+  // Home/header surfaces (Fretebras/Airbnb-inspired)
+  static const lightHeader = Color(0xFF141414);
+  static const lightOnHeader = Color(0xFFFFFFFF);
+  static const lightHeaderMuted = Color(0xFFB9BCC2);
+
   // Outline and shadow
   static const lightOutline = Color(0xFF74777F);
   static const lightShadow = Color(0xFF000000);
@@ -151,6 +156,11 @@ class DarkModeColors {
   static const darkOnSurface = Color(0xFFE2E8F0);
   static const darkSurfaceVariant = Color(0xFF44474E);
   static const darkOnSurfaceVariant = Color(0xFFC4C7CF);
+
+  // Home/header surfaces (Fretebras/Airbnb-inspired)
+  static const darkHeader = Color(0xFF141414);
+  static const darkOnHeader = Color(0xFFFFFFFF);
+  static const darkHeaderMuted = Color(0xFFB9BCC2);
 
   // Outline and shadow
   static const darkOutline = Color(0xFF8E9099);
@@ -263,8 +273,21 @@ ThemeData get lightTheme => ThemeData(
     height: AppSizes.navBarHeight,
     elevation: 0,
     backgroundColor: LightModeColors.lightSurface,
-    indicatorColor: LightModeColors.lightPrimaryContainer,
-    labelTextStyle: WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
+    indicatorColor: Colors.transparent,
+    iconTheme: WidgetStateProperty.resolveWith((states) {
+      final isSelected = states.contains(WidgetState.selected);
+      return IconThemeData(
+        size: 26,
+        color: isSelected ? LightModeColors.lightPrimary : LightModeColors.lightOnSurfaceVariant.withValues(alpha: 0.75),
+      );
+    }),
+    labelTextStyle: WidgetStateProperty.resolveWith((states) {
+      final isSelected = states.contains(WidgetState.selected);
+      return TextStyle(
+        fontWeight: FontWeight.w600,
+        color: isSelected ? LightModeColors.lightPrimary : LightModeColors.lightOnSurfaceVariant.withValues(alpha: 0.75),
+      );
+    }),
   ),
   chipTheme: ChipThemeData(
     side: BorderSide.none,
@@ -366,8 +389,21 @@ ThemeData get darkTheme => ThemeData(
     height: AppSizes.navBarHeight,
     elevation: 0,
     backgroundColor: DarkModeColors.darkSurface2,
-    indicatorColor: DarkModeColors.darkPrimaryContainer,
-    labelTextStyle: WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
+    indicatorColor: Colors.transparent,
+    iconTheme: WidgetStateProperty.resolveWith((states) {
+      final isSelected = states.contains(WidgetState.selected);
+      return IconThemeData(
+        size: 26,
+        color: isSelected ? DarkModeColors.darkPrimary : DarkModeColors.darkOnSurfaceVariant.withValues(alpha: 0.72),
+      );
+    }),
+    labelTextStyle: WidgetStateProperty.resolveWith((states) {
+      final isSelected = states.contains(WidgetState.selected);
+      return TextStyle(
+        fontWeight: FontWeight.w600,
+        color: isSelected ? DarkModeColors.darkPrimary : DarkModeColors.darkOnSurfaceVariant.withValues(alpha: 0.72),
+      );
+    }),
   ),
   chipTheme: ChipThemeData(
     side: BorderSide.none,

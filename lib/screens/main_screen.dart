@@ -130,15 +130,17 @@ class _MainScreenState extends State<MainScreen> {
           context.go('${AppRoutes.home}?tab=${_tabFromIndex(index)}');
         },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Início'),
-          NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore), label: 'Explorar'),
+          // Ícones sempre "outline"; estado selecionado é apenas pela cor (verde sutil), sem indicador.
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_outlined), label: 'Início'),
+          NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore_outlined), label: 'Explorar'),
           NavigationDestination(
             icon: Icon(Icons.local_shipping_outlined),
-            selectedIcon: Icon(Icons.local_shipping),
+            selectedIcon: Icon(Icons.local_shipping_outlined),
             label: 'Entregas',
           ),
-          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: 'Chat'),
-          NavigationDestination(icon: Icon(Icons.menu), selectedIcon: Icon(Icons.menu_open), label: 'Menu'),
+          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble_outline), label: 'Chat'),
+          // Menu não troca ícone quando selecionado.
+          NavigationDestination(icon: Icon(Icons.menu), selectedIcon: Icon(Icons.menu), label: 'Menu'),
         ],
       ),
     );
