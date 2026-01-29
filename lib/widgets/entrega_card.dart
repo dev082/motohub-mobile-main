@@ -13,6 +13,11 @@ class EntregaCard extends StatelessWidget {
   final VoidCallback? onAdvanceStage;
   final bool isAdvancing;
 
+  /// Menu actions (3 dots)
+  final VoidCallback? onViewMap;
+  final VoidCallback? onViewDetails;
+  final VoidCallback? onSendMessage;
+
   const EntregaCard({
     super.key,
     required this.entrega,
@@ -21,6 +26,9 @@ class EntregaCard extends StatelessWidget {
     this.onSelect,
     this.onAdvanceStage,
     this.isAdvancing = false,
+    this.onViewMap,
+    this.onViewDetails,
+    this.onSendMessage,
   });
 
   Color _getStatusColor() {
@@ -68,6 +76,7 @@ class EntregaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final action = _nextStageAction();
+    final cs = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       child: InkWell(
@@ -78,26 +87,6 @@ class EntregaCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (_isActiveEntrega) ...[
-                EntregaCardActionRow(
-                  isSelected: isSelected,
-                  onSelect: onSelect,
-                  primaryActionLabel: action?.label,
-                  primaryActionIcon: action?.icon,
-                  onPrimaryAction: isSelected ? onAdvanceStage : null,
-                  isPrimaryLoading: isAdvancing,
-                ),
-                const SizedBox(height: AppSpacing.md),
-              ],
-              if (_isActiveEntrega) ...[
-                EntregaRoutePreview(
-                  origem: entrega.carga?.origem,
-                  destino: entrega.carga?.destino,
-                  consumoKmPorLitro: 25, // estimativa padrão (pode virar config no futuro)
-                ),
-                const SizedBox(height: AppSpacing.md),
-              ],
-
               // Header with code and status
               Row(
                 children: [
@@ -119,6 +108,12 @@ class EntregaCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
+                  if (_isActiveEntrega)
+                    _ActiveEntregaToggle(
+                      isSelected: isSelected,
+                      onPressed: onSelect,
+                    ),
+                  if (_isActiveEntrega) const SizedBox(width: AppSpacing.xs),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.sm,
@@ -136,6 +131,13 @@ class EntregaCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(width: AppSpacing.xs),
+                  _EntregaCardMenu(
+                    onViewMap: onViewMap,
+                    onViewDetails: onViewDetails ?? onTap,
+                    onSendMessage: onSendMessage,
+                    iconColor: cs.onSurfaceVariant,
+                  ),
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
@@ -147,6 +149,16 @@ class EntregaCard extends StatelessWidget {
                   style: context.textStyles.bodyMedium,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+
+              // Route metrics (distance/ETA) between description and the route section.
+              if (entrega.carga != null) ...[
+                EntregaRouteMetrics(
+                  origem: entrega.carga?.origem,
+                  destino: entrega.carga?.destino,
+                  consumoKmPorLitro: 25,
                 ),
                 const SizedBox(height: AppSpacing.md),
               ],
@@ -253,6 +265,21 @@ class EntregaCard extends StatelessWidget {
                     ),
                 ],
               ),
+
+              if (_isActiveEntrega && action != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                SizedBox(
+                  width: double.infinity,
+                  child: _AdvanceStageButton(
+                    label: action.label,
+                    icon: action.icon,
+                    onPressed: isSelected ? onAdvanceStage : null,
+                    isLoading: isAdvancing,
+                    activeBg: cs.primary,
+                    activeFg: cs.onPrimary,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -261,54 +288,8 @@ class EntregaCard extends StatelessWidget {
   }
 }
 
-class EntregaCardActionRow extends StatelessWidget {
-  const EntregaCardActionRow({
-    super.key,
-    required this.isSelected,
-    this.onSelect,
-    this.primaryActionLabel,
-    this.primaryActionIcon,
-    this.onPrimaryAction,
-    this.isPrimaryLoading = false,
-  });
-
-  final bool isSelected;
-  final VoidCallback? onSelect;
-  final String? primaryActionLabel;
-  final IconData? primaryActionIcon;
-  final VoidCallback? onPrimaryAction;
-  final bool isPrimaryLoading;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Expanded(
-          child: _SelectEntregaButton(
-            isSelected: isSelected,
-            onPressed: onSelect,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          flex: 2,
-          child: _AdvanceStageButton(
-            label: primaryActionLabel,
-            icon: primaryActionIcon,
-            onPressed: onPrimaryAction,
-            isLoading: isPrimaryLoading,
-            activeBg: cs.primary,
-            activeFg: cs.onPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SelectEntregaButton extends StatelessWidget {
-  const _SelectEntregaButton({required this.isSelected, this.onPressed});
+class _ActiveEntregaToggle extends StatelessWidget {
+  const _ActiveEntregaToggle({required this.isSelected, this.onPressed});
 
   final bool isSelected;
   final VoidCallback? onPressed;
@@ -316,17 +297,13 @@ class _SelectEntregaButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = isSelected ? cs.primaryContainer : cs.surfaceContainerHighest;
-    final fg = isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant;
-    final icon = isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked;
-    final label = isSelected ? 'Ativa' : 'Selecionar';
-
+    final enabled = !isSelected && onPressed != null;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
+      duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
+        color: isSelected ? cs.primaryContainer : cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: isSelected ? cs.primary.withValues(alpha: 0.35) : cs.outline.withValues(alpha: 0.18),
           width: 1,
@@ -335,21 +312,87 @@ class _SelectEntregaButton extends StatelessWidget {
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
-          onTap: isSelected ? null : onPressed,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
+          onTap: enabled ? onPressed : null,
+          borderRadius: BorderRadius.circular(999),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 18, color: isSelected ? cs.primary : fg),
+                Icon(
+                  isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+                  size: 16,
+                  color: isSelected ? cs.primary : cs.onSurfaceVariant,
+                ),
                 const SizedBox(width: AppSpacing.xs),
-                Text(label, style: context.textStyles.labelLarge?.copyWith(color: fg, fontWeight: FontWeight.w700)),
+                Text(
+                  isSelected ? 'Selecionada' : 'Selecionar',
+                  style: context.textStyles.labelSmall?.copyWith(color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant, fontWeight: FontWeight.w700),
+                ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+enum _EntregaCardMenuAction { viewMap, viewDetails, sendMessage }
+
+class _EntregaCardMenu extends StatelessWidget {
+  const _EntregaCardMenu({
+    required this.onViewMap,
+    required this.onViewDetails,
+    required this.onSendMessage,
+    required this.iconColor,
+  });
+
+  final VoidCallback? onViewMap;
+  final VoidCallback? onViewDetails;
+  final VoidCallback? onSendMessage;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasAny = onViewMap != null || onViewDetails != null || onSendMessage != null;
+    if (!hasAny) {
+      return Icon(Icons.more_vert, size: 20, color: iconColor.withValues(alpha: 0.35));
+    }
+
+    return PopupMenuButton<_EntregaCardMenuAction>(
+      tooltip: 'Mais opções',
+      icon: Icon(Icons.more_vert, size: 20, color: iconColor),
+      itemBuilder: (context) => [
+        if (onViewMap != null)
+          PopupMenuItem(
+            value: _EntregaCardMenuAction.viewMap,
+            child: Row(children: [Icon(Icons.map, size: 18, color: iconColor), const SizedBox(width: AppSpacing.sm), const Text('Ver no mapa')]),
+          ),
+        if (onViewDetails != null)
+          PopupMenuItem(
+            value: _EntregaCardMenuAction.viewDetails,
+            child: Row(children: [Icon(Icons.info_outline, size: 18, color: iconColor), const SizedBox(width: AppSpacing.sm), const Text('Ver detalhes')]),
+          ),
+        if (onSendMessage != null)
+          PopupMenuItem(
+            value: _EntregaCardMenuAction.sendMessage,
+            child: Row(children: [Icon(Icons.chat_bubble_outline, size: 18, color: iconColor), const SizedBox(width: AppSpacing.sm), const Text('Enviar mensagem')]),
+          ),
+      ],
+      onSelected: (action) {
+        switch (action) {
+          case _EntregaCardMenuAction.viewMap:
+            onViewMap?.call();
+            break;
+          case _EntregaCardMenuAction.viewDetails:
+            onViewDetails?.call();
+            break;
+          case _EntregaCardMenuAction.sendMessage:
+            onSendMessage?.call();
+            break;
+        }
+      },
     );
   }
 }

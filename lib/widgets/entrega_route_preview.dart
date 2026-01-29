@@ -30,6 +30,98 @@ class EntregaRoutePreview extends StatefulWidget {
   State<EntregaRoutePreview> createState() => _EntregaRoutePreviewState();
 }
 
+/// Route metrics (distance, ETA, fuel estimate) without rendering a map.
+///
+/// This is meant for compact surfaces like list cards.
+class EntregaRouteMetrics extends StatefulWidget {
+  final EnderecoCarga? origem;
+  final EnderecoCarga? destino;
+
+  /// If provided, used to estimate fuel consumption in liters.
+  /// Example: 25 means 25 km/L.
+  final double? consumoKmPorLitro;
+
+  const EntregaRouteMetrics({
+    super.key,
+    required this.origem,
+    required this.destino,
+    this.consumoKmPorLitro,
+  });
+
+  @override
+  State<EntregaRouteMetrics> createState() => _EntregaRouteMetricsState();
+}
+
+class _EntregaRouteMetricsState extends State<EntregaRouteMetrics> {
+  late final Future<RouteResult?> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<RouteResult?> _load() async {
+    final o = widget.origem;
+    final d = widget.destino;
+    if (o?.latitude == null || o?.longitude == null || d?.latitude == null || d?.longitude == null) {
+      return null;
+    }
+
+    final origin = LatLng(o!.latitude!, o.longitude!);
+    final dest = LatLng(d!.latitude!, d.longitude!);
+
+    final cached = RouteService.instance.getCached(origin, dest);
+    if (cached != null) return cached;
+
+    return RouteService.instance.getDrivingRoute(origin: origin, destination: dest);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final origem = widget.origem;
+    final destino = widget.destino;
+    final hasCoords = origem?.latitude != null && origem?.longitude != null && destino?.latitude != null && destino?.longitude != null;
+    if (!hasCoords) {
+      return _MissingCoordsPlaceholder(height: 56);
+    }
+
+    return FutureBuilder<RouteResult?>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _LoadingPlaceholder(height: 56);
+        }
+        if (snapshot.hasError || snapshot.data == null) {
+          return _RouteErrorPlaceholder(height: 56);
+        }
+
+        final route = snapshot.data!;
+        final fuel = _estimateFuelLiters(route.distanceKm);
+        final durationText = _formatDuration(route.duration);
+        final distanceText = '${route.distanceKm.toStringAsFixed(1)} km';
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: _MetricsPill(distanceText: distanceText, durationText: durationText, fuelLiters: fuel),
+        );
+      },
+    );
+  }
+
+  String _formatDuration(Duration d) {
+    final hours = d.inHours;
+    final minutes = d.inMinutes.remainder(60);
+    if (hours <= 0) return '${d.inMinutes} min';
+    return '${hours}h ${minutes}min';
+  }
+
+  double? _estimateFuelLiters(double km) {
+    final consumo = widget.consumoKmPorLitro;
+    if (consumo == null || consumo <= 0) return null;
+    return km / consumo;
+  }
+}
+
 class _EntregaRoutePreviewState extends State<EntregaRoutePreview> {
   late final Future<RouteResult?> _future;
 

@@ -294,6 +294,8 @@ class AppProvider with ChangeNotifier {
   Motorista? get currentMotorista => _currentMotorista;
   String? get activeEntregaId => _activeEntregaId;
   int get entregasRealtimeTick => _entregasRealtimeTick;
+  TrackingState get trackingState => _trackingService.currentState;
+  bool get isLocationTrackingActive => _trackingService.isTracking && _trackingService.currentState != TrackingState.offline;
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
   String? get errorMessage => _errorMessage;

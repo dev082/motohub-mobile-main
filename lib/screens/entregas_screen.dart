@@ -291,6 +291,8 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
       appBar: AppBar(
         title: const Text('Minhas Entregas'),
         actions: [
+          const _LocationTrackingBadge(),
+          const SizedBox(width: 6),
           IconButton(
             tooltip: 'Atualizar entregas',
             onPressed: _isRefreshing ? null : _loadEntregas,
@@ -390,8 +392,49 @@ class _EntregasScreenState extends State<EntregasScreen> with SingleTickerProvid
           onSelect: () => app.setActiveEntregaId(entrega.id),
           onAdvanceStage: () => _advanceStage(entrega),
           isAdvancing: _updatingEntregaIds.contains(entrega.id),
+          onViewDetails: () => showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            showDragHandle: true,
+            builder: (context) => EntregaDetailsSheet(entrega: entrega),
+          ),
+          onViewMap: () => context.push(AppRoutes.entregaMapaPath(entrega.id)),
+          onSendMessage: () => context.push(AppRoutes.chatPath(entrega.id)),
         );
       },
+    );
+  }
+}
+
+class _LocationTrackingBadge extends StatelessWidget {
+  const _LocationTrackingBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppProvider>();
+    final active = app.isLocationTrackingActive;
+    final cs = Theme.of(context).colorScheme;
+
+    final bg = active ? cs.tertiaryContainer : cs.errorContainer;
+    final fg = active ? cs.onTertiaryContainer : cs.onErrorContainer;
+    final icon = active ? Icons.location_searching : Icons.location_disabled;
+    final label = active ? 'Localização ativa' : 'Localização inativa';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.18), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: fg),
+          const SizedBox(width: 6),
+          Text(label, style: context.textStyles.labelSmall?.copyWith(color: fg, fontWeight: FontWeight.w700)),
+        ],
+      ),
     );
   }
 }
