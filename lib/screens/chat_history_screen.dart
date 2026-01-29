@@ -59,9 +59,11 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
+      backgroundColor: scheme.surface,
       appBar: AppBar(
-        title: const Text('Histórico de chats'),
+        title: const Text('Histórico'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -70,7 +72,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
               : RefreshIndicator(
                   onRefresh: _loadHistorico,
                   child: ListView.builder(
-                    padding: AppSpacing.paddingMd,
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.lg),
                     itemCount: _entregasFinalizadas.length,
                     itemBuilder: (context, index) {
                       final entrega = _entregasFinalizadas[index];

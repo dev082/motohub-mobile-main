@@ -6,7 +6,6 @@ import 'package:hubfrete/providers/app_provider.dart';
 import 'package:hubfrete/services/chat_service.dart';
 import 'package:hubfrete/services/entrega_service.dart';
 import 'package:hubfrete/theme.dart';
-import 'package:hubfrete/widgets/app_drawer.dart';
 import 'package:hubfrete/widgets/chat_conversation_card.dart';
 import 'package:hubfrete/widgets/chat_section.dart';
 import 'package:hubfrete/widgets/pull_to_refresh.dart';
@@ -63,7 +62,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
+      backgroundColor: scheme.surface,
       appBar: AppBar(
         title: const Text('Conversas'),
         actions: [
@@ -88,18 +89,24 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         ),
                       ],
                     )
-                  : ListView.builder(
+                  : ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: AppSpacing.paddingMd,
-                      itemCount: 1,
-                      itemBuilder: (context, index) => _ChatSectionsList(
-                        entregas: _entregasComChat,
-                        expandedAguardandoColeta: _expandedAguardandoColeta,
-                        expandedEmTransito: _expandedEmTransito,
-                        onToggleAguardandoColeta: () => setState(() => _expandedAguardandoColeta = !_expandedAguardandoColeta),
-                        onToggleEmTransito: () => setState(() => _expandedEmTransito = !_expandedEmTransito),
-                        buildChatItem: (entrega) => _buildChatItem(context, entrega),
-                      ),
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.lg),
+                      children: [
+                        Text(
+                          'Ativas agora',
+                          style: context.textStyles.titleSmall?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        _ChatSectionsList(
+                          entregas: _entregasComChat,
+                          expandedAguardandoColeta: _expandedAguardandoColeta,
+                          expandedEmTransito: _expandedEmTransito,
+                          onToggleAguardandoColeta: () => setState(() => _expandedAguardandoColeta = !_expandedAguardandoColeta),
+                          onToggleEmTransito: () => setState(() => _expandedEmTransito = !_expandedEmTransito),
+                          buildChatItem: (entrega) => _buildChatItem(context, entrega),
+                        ),
+                      ],
                     ),
             ),
     );

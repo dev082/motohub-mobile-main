@@ -56,80 +56,72 @@ class ChatConversationCard extends StatelessWidget {
             border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.35)),
           ),
           clipBehavior: Clip.antiAlias,
-          child: Row(
-            children: [
-              Container(width: 4, height: 92, color: accent),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Row(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: Icon(icon, color: accent, size: 22),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                        ),
-                        child: Icon(icon, color: accent, size: 22),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    title,
-                                    style: context.textStyles.titleMedium?.semiBold,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.sm),
-                                _StatusChip(status: entrega.status, accent: accent),
-                              ],
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: context.textStyles.titleMedium?.semiBold,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 6),
-                            FutureBuilder<Mensagem?>(
-                              future: lastMessageFuture,
-                              builder: (context, snapshot) {
-                                final msg = snapshot.data;
-                                final text = _buildPreviewText(msg);
-                                return Text(
-                                  text,
-                                  style: context.textStyles.bodySmall?.copyWith(
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                );
-                              },
-                            ),
-                            if (route != null) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                route.toUpperCase(),
-                                style: context.textStyles.labelSmall?.copyWith(
-                                  color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
-                                  letterSpacing: 0.6,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          _StatusChip(status: entrega.status, accent: accent),
+                        ],
                       ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Icon(Icons.chevron_right, color: scheme.outline.withValues(alpha: 0.7)),
+                      const SizedBox(height: 6),
+                      FutureBuilder<Mensagem?>(
+                        future: lastMessageFuture,
+                        builder: (context, snapshot) {
+                          final msg = snapshot.data;
+                          final text = _buildPreviewText(msg);
+                          return Text(
+                            text,
+                            style: context.textStyles.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        },
+                      ),
+                      if (route != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          route.toUpperCase(),
+                          style: context.textStyles.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+                            letterSpacing: 0.6,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: AppSpacing.sm),
+                Icon(Icons.chevron_right, color: scheme.outline.withValues(alpha: 0.7)),
+              ],
+            ),
           ),
         ),
       ),

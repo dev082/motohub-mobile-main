@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,7 +10,6 @@ import 'package:hubfrete/services/chat_service.dart';
 import 'package:hubfrete/services/entrega_service.dart';
 import 'package:hubfrete/supabase/supabase_config.dart';
 import 'package:hubfrete/theme.dart';
-import 'package:hubfrete/widgets/chat_wallpaper_sheet.dart';
 import 'package:hubfrete/widgets/attachment_pickers.dart';
 import 'package:hubfrete/widgets/chat_attachment_preview.dart';
 import 'package:hubfrete/widgets/chat_details_sheet.dart';
@@ -66,12 +64,6 @@ class _ChatScreenState extends State<ChatScreen> {
       context.read<AppProvider>().setActiveChatEntregaId(widget.entregaId);
     });
     _load();
-
-    // Load wallpaper preferences (safe no-op if already loaded).
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      context.read<AppProvider>().loadChatWallpaperPrefs();
-    });
   }
 
   @override
@@ -415,16 +407,9 @@ class _ChatScreenState extends State<ChatScreen> {
             builder: (_) => ChatDetailsSheet(entrega: entrega, chat: chat),
           );
         },
-        onOpenWallpaper: () => showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          useSafeArea: true,
-          showDragHandle: true,
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          builder: (_) => const ChatWallpaperSheet(),
-        ),
       ),
-      body: _ChatWallpaperScaffold(
+      body: ColoredBox(
+        color: Theme.of(context).brightness == Brightness.dark ? ChatColors.darkChatBackground : ChatColors.lightChatBackground,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _chat == null
@@ -433,10 +418,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       if (!_realtimeReady)
                         Padding(
-                          padding: const EdgeInsets.only(
-                              top: AppSpacing.sm,
-                              left: AppSpacing.md,
-                              right: AppSpacing.md),
+                          padding: const EdgeInsets.only(top: AppSpacing.sm, left: AppSpacing.md, right: AppSpacing.md),
                           child: _ConnectionHint(isRealtime: _realtimeReady),
                         ),
                       Expanded(
@@ -458,77 +440,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
       ),
     );
-  }
-}
-
-class _ChatWallpaperScaffold extends StatelessWidget {
-  const _ChatWallpaperScaffold({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final prefs = context.watch<AppProvider>();
-    final dataUri = prefs.chatWallpaperUrl;
-    final opacity = prefs.chatWallpaperOpacity;
-
-    final chatBg = Theme.of(context).brightness == Brightness.dark
-        ? ChatColors.darkChatBackground
-        : ChatColors.lightChatBackground;
-
-    if (dataUri == null) return ColoredBox(color: chatBg, child: child);
-
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: _WallpaperImage(dataUri: dataUri, fallbackColor: scheme.surface),
-        ),
-        Positioned.fill(
-          child: Container(
-            color: scheme.surface.withValues(alpha: opacity),
-          ),
-        ),
-        Positioned.fill(child: child),
-      ],
-    );
-  }
-}
-
-class _WallpaperImage extends StatelessWidget {
-  const _WallpaperImage({required this.dataUri, required this.fallbackColor});
-
-  final String dataUri;
-  final Color fallbackColor;
-
-  @override
-  Widget build(BuildContext context) {
-    try {
-      if (dataUri.startsWith('data:')) {
-        // Parse data URI: data:image/png;base64,iVBORw0KGgoAAAANS...
-        final commaIndex = dataUri.indexOf(',');
-        if (commaIndex == -1) return Container(color: fallbackColor);
-        
-        final base64Data = dataUri.substring(commaIndex + 1);
-        final bytes = base64Decode(base64Data);
-        
-        return Image.memory(
-          bytes,
-          fit: BoxFit.cover,
-          errorBuilder: (context, _, __) => Container(color: fallbackColor),
-        );
-      } else {
-        // Fallback for old network URLs (if any exist)
-        return Image.network(
-          dataUri,
-          fit: BoxFit.cover,
-          errorBuilder: (context, _, __) => Container(color: fallbackColor),
-        );
-      }
-    } catch (e) {
-      debugPrint('Wallpaper decode error: $e');
-      return Container(color: fallbackColor);
-    }
   }
 }
 
@@ -915,13 +826,11 @@ class _ChatTopBar extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     required this.subtitle,
     required this.onOpenDetails,
-    required this.onOpenWallpaper,
   });
 
   final String title;
   final String? subtitle;
   final VoidCallback onOpenDetails;
-  final VoidCallback onOpenWallpaper;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -974,33 +883,11 @@ class _ChatTopBar extends StatelessWidget implements PreferredSizeWidget {
         ),
       ),
       actions: [
-        PopupMenuButton<_ChatMenuAction>(
-          tooltip: 'Opções',
-          icon: Icon(Icons.more_vert, color: scheme.onSurface),
-          onSelected: (action) {
-            if (action == _ChatMenuAction.wallpaper) onOpenWallpaper();
-          },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: _ChatMenuAction.wallpaper,
-              child: Row(
-                children: [
-                  Icon(Icons.wallpaper_outlined,
-                      size: 18, color: scheme.onSurfaceVariant),
-                  const SizedBox(width: 10),
-                  Text('Wallpaper'),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 8),
       ],
     );
   }
 }
-
-enum _ChatMenuAction { wallpaper }
 
 bool _isSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
