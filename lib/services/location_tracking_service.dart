@@ -141,8 +141,24 @@ class LocationTrackingService {
     final config = TrackingConfig.forState(_currentState);
     if (config.intervalSeconds == 0) return;
 
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: AndroidSettings(
+    final locationSettings = _buildLocationSettings(config);
+
+    _positionStream = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+      _onPositionUpdate,
+      onError: (error) => debugPrint('[LocationTracking] Erro no stream: $error'),
+    );
+
+    _isTracking = true;
+  }
+
+  LocationSettings _buildLocationSettings(TrackingConfig config) {
+    // Web e iOS não suportam AndroidSettings.
+    if (kIsWeb) {
+      return LocationSettings(accuracy: _getAccuracyForState(_currentState), distanceFilter: config.distanceFilterMeters.toInt());
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return AndroidSettings(
         accuracy: _getAccuracyForState(_currentState),
         distanceFilter: config.distanceFilterMeters.toInt(),
         intervalDuration: Duration(seconds: config.intervalSeconds),
@@ -151,13 +167,15 @@ class LocationTrackingService {
           notificationTitle: 'Motorista em rota',
           enableWakeLock: true,
         ),
-      ),
-    ).listen(
-      _onPositionUpdate,
-      onError: (error) => debugPrint('[LocationTracking] Erro no stream: $error'),
-    );
+      );
+    }
 
-    _isTracking = true;
+    return AppleSettings(
+      accuracy: _getAccuracyForState(_currentState),
+      distanceFilter: config.distanceFilterMeters.toInt(),
+      pauseLocationUpdatesAutomatically: false,
+      showBackgroundLocationIndicator: true,
+    );
   }
 
   Future<void> _stopTracking() async {

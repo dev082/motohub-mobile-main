@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:hubfrete/providers/app_provider.dart';
 import 'package:hubfrete/services/notification_service.dart';
 import 'package:hubfrete/supabase/supabase_config.dart';
@@ -20,6 +21,17 @@ import 'nav.dart';
 /// - Material 3 theming with Hub Frete green branding
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Necessário para SQLite em desktop (Linux/Windows/macOS). Sem isso, o sqflite
+  // pode falhar com "databaseFactory not initialized".
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS ||
+          defaultTargetPlatform == TargetPlatform.windows)) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
   try {
     await initializeDateFormatting('pt_BR');
     Intl.defaultLocale = 'pt_BR';
