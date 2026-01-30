@@ -50,7 +50,7 @@ class LocationPoint {
         synced: (json['synced'] as int) == 1,
       );
 
-  /// Converte para JSON do Supabase (tabela 'localizações')
+  /// Converte para JSON do Supabase (tabela 'localizacoes')
   /// Apenas campos GPS + motorista_id - trigger faz o resto!
   Map<String, dynamic> toSupabaseJson() => {
         'motorista_id': motoristaId,
