@@ -1,4 +1,4 @@
--- Tabela de localizações em tempo real (locations)
+-- Tabela de localizacoes em tempo real (locations)
 CREATE TABLE IF NOT EXISTS public.locations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   entrega_id UUID NOT NULL REFERENCES public.entregas(id) ON DELETE CASCADE,
@@ -99,21 +99,21 @@ ALTER TABLE public.devices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications_log ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies para locations
-CREATE POLICY "Motoristas podem inserir suas localizações"
+CREATE POLICY "Motoristas podem inserir suas localizacoes"
   ON public.locations FOR INSERT
   TO authenticated
   WITH CHECK (
     auth.uid() IN (SELECT user_id FROM public.motoristas WHERE id = motorista_id)
   );
 
-CREATE POLICY "Motoristas podem ver suas localizações"
+CREATE POLICY "Motoristas podem ver suas localizacoes"
   ON public.locations FOR SELECT
   TO authenticated
   USING (
     auth.uid() IN (SELECT user_id FROM public.motoristas WHERE id = motorista_id)
   );
 
-CREATE POLICY "Embarcadores podem ver localizações de suas entregas"
+CREATE POLICY "Embarcadores podem ver localizacoes de suas entregas"
   ON public.locations FOR SELECT
   TO authenticated
   USING (

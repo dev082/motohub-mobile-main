@@ -177,7 +177,7 @@ Adicione as permissões no arquivo `ios/Runner/Info.plist`:
 ### **Dados:**
 - ✅ Compressão: apenas campos alterados são enviados
 - ✅ Batch updates quando offline
-- ✅ Cache agressivo com Hive (até 100 localizações)
+- ✅ Cache agressivo com Hive (até 100 localizacoes)
 
 ### **Conexão:**
 - ✅ Reconexão automática com backoff exponencial
@@ -268,7 +268,7 @@ Histórico de todas as notificações enviadas.
 - Confira se a migration foi aplicada corretamente
 - Veja os logs no Debug Console: `mcp__hologram__get_app_logs`
 
-### **Problema: Localizações não aparecem no Supabase**
+### **Problema: localizacoes não aparecem no Supabase**
 - Verifique se as Edge Functions foram deployed
 - Confirme se o RLS está configurado corretamente
 - Teste chamando a Edge Function `process-location` manualmente

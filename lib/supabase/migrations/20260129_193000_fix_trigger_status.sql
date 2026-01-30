@@ -1,5 +1,5 @@
 -- Fix trigger: Remove reference to non-existent status_entrega column
--- The localizações table has "status" (boolean), not "status_entrega" (enum)
+-- The localizacoes table has "status" (boolean), not "status_entrega" (enum)
 -- We'll derive the status from the entrega's current status instead
 
 CREATE OR REPLACE FUNCTION public.sync_localizacoes_to_tracking_historico()

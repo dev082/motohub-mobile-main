@@ -2,34 +2,34 @@
 -- Fix: Real-time location → tracking_historico sync
 --
 -- Problem we are solving:
--- - The app writes the driver's current position into public."localizações".
+-- - The app writes the driver's current position into public."localizacoes".
 -- - tracking_historico must record EVERY point for a delivery.
--- - The previous trigger file targeted columns that do not exist in "localizações"
+-- - The previous trigger file targeted columns that do not exist in "localizacoes"
 --   (and it wasn't timestamped, so it may not be applied as a migration).
 --
 -- This migration:
--- 1) Extends public."localizações" with the minimum fields needed to create history rows.
+-- 1) Extends public."localizacoes" with the minimum fields needed to create history rows.
 -- 2) Creates a trigger that inserts into public.tracking_historico on INSERT/UPDATE.
 -- 3) Only inserts when NEW.entrega_id is present.
 -- =====================================================
 
--- 1) Ensure required columns exist in public."localizações"
-ALTER TABLE IF EXISTS public."localizações"
+-- 1) Ensure required columns exist in public."localizacoes"
+ALTER TABLE IF EXISTS public."localizacoes"
   ADD COLUMN IF NOT EXISTS entrega_id UUID REFERENCES public.entregas(id) ON DELETE SET NULL;
 
-ALTER TABLE IF EXISTS public."localizações"
+ALTER TABLE IF EXISTS public."localizacoes"
   ADD COLUMN IF NOT EXISTS status_entrega public.status_entrega;
 
-ALTER TABLE IF EXISTS public."localizações"
+ALTER TABLE IF EXISTS public."localizacoes"
   ADD COLUMN IF NOT EXISTS accuracy NUMERIC(6, 2);
 
-ALTER TABLE IF EXISTS public."localizações"
+ALTER TABLE IF EXISTS public."localizacoes"
   ADD COLUMN IF NOT EXISTS heading NUMERIC(6, 2);
 
-ALTER TABLE IF EXISTS public."localizações"
+ALTER TABLE IF EXISTS public."localizacoes"
   ADD COLUMN IF NOT EXISTS altitude NUMERIC(8, 2);
 
-ALTER TABLE IF EXISTS public."localizações"
+ALTER TABLE IF EXISTS public."localizacoes"
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
 -- Keep updated_at fresh
@@ -41,9 +41,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trigger_localizacoes_set_updated_at ON public."localizações";
+DROP TRIGGER IF EXISTS trigger_localizacoes_set_updated_at ON public."localizacoes";
 CREATE TRIGGER trigger_localizacoes_set_updated_at
-  BEFORE UPDATE ON public."localizações"
+  BEFORE UPDATE ON public."localizacoes"
   FOR EACH ROW
   EXECUTE FUNCTION public.set_localizacoes_updated_at();
 
@@ -80,8 +80,8 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 3) Trigger on INSERT/UPDATE
-DROP TRIGGER IF EXISTS trigger_localizacoes_to_historico ON public."localizações";
+DROP TRIGGER IF EXISTS trigger_localizacoes_to_historico ON public."localizacoes";
 CREATE TRIGGER trigger_localizacoes_to_historico
-  AFTER INSERT OR UPDATE ON public."localizações"
+  AFTER INSERT OR UPDATE ON public."localizacoes"
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_localizacoes_to_tracking_historico();

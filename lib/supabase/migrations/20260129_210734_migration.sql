@@ -9,23 +9,23 @@
 -- =====================================================
 
 -- 1.1. Remover colunas desnecessárias
-ALTER TABLE localizações DROP COLUMN IF EXISTS entrega_id;
-ALTER TABLE localizações DROP COLUMN IF EXISTS email_motorista;
-ALTER TABLE localizações DROP COLUMN IF EXISTS status;
-ALTER TABLE localizações DROP COLUMN IF EXISTS visivel;
+ALTER TABLE localizacoes DROP COLUMN IF EXISTS entrega_id;
+ALTER TABLE localizacoes DROP COLUMN IF EXISTS email_motorista;
+ALTER TABLE localizacoes DROP COLUMN IF EXISTS status;
+ALTER TABLE localizacoes DROP COLUMN IF EXISTS visivel;
 
 -- 1.2. Adicionar colunas necessárias
-ALTER TABLE localizações ADD COLUMN IF NOT EXISTS motorista_id UUID;
-ALTER TABLE localizações ADD COLUMN IF NOT EXISTS altitude FLOAT;
+ALTER TABLE localizacoes ADD COLUMN IF NOT EXISTS motorista_id UUID;
+ALTER TABLE localizacoes ADD COLUMN IF NOT EXISTS altitude FLOAT;
 
 -- 1.3. Criar foreign key para motoristas
 DO $$ 
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'localizações_motorista_id_fkey'
+    SELECT 1 FROM pg_constraint WHERE conname = 'localizacoes_motorista_id_fkey'
   ) THEN
-    ALTER TABLE localizações
-    ADD CONSTRAINT localizações_motorista_id_fkey
+    ALTER TABLE localizacoes
+    ADD CONSTRAINT localizacoes_motorista_id_fkey
     FOREIGN KEY (motorista_id)
     REFERENCES motoristas(id)
     ON DELETE CASCADE;
@@ -33,12 +33,12 @@ BEGIN
 END $$;
 
 -- 1.4. Criar índice para performance
-CREATE INDEX IF NOT EXISTS idx_localizações_motorista_id ON localizações(motorista_id);
+CREATE INDEX IF NOT EXISTS idx_localizacoes_motorista_id ON localizacoes(motorista_id);
 
 -- 1.5. Comentários explicativos
-COMMENT ON TABLE localizações IS 'Posição GPS em tempo real dos motoristas. Apenas última posição de cada motorista. O trigger sync_localizacoes_to_tracking_historico() popula tracking_historico de forma inteligente.';
-COMMENT ON COLUMN localizações.motorista_id IS 'ID do motorista. Usado para buscar entregas ativas e popular tracking_historico.';
-COMMENT ON COLUMN localizações.altitude IS 'Altitude em metros. Pode ser NULL se o GPS não fornecer.';
+COMMENT ON TABLE localizacoes IS 'Posição GPS em tempo real dos motoristas. Apenas última posição de cada motorista. O trigger sync_localizacoes_to_tracking_historico() popula tracking_historico de forma inteligente.';
+COMMENT ON COLUMN localizacoes.motorista_id IS 'ID do motorista. Usado para buscar entregas ativas e popular tracking_historico.';
+COMMENT ON COLUMN localizacoes.altitude IS 'Altitude em metros. Pode ser NULL se o GPS não fornecer.';
 
 -- =====================================================
 -- PARTE 2: ATUALIZAR TABELA 'tracking_historico'
@@ -81,7 +81,7 @@ COMMENT ON COLUMN tracking_historico.status IS 'Status da entrega no momento do 
 -- =====================================================
 
 -- 3.1. Remover trigger e função antigas
-DROP TRIGGER IF EXISTS sync_localizacoes_trigger ON localizações;
+DROP TRIGGER IF EXISTS sync_localizacoes_trigger ON localizacoes;
 DROP FUNCTION IF EXISTS public.sync_localizacoes_to_tracking_historico();
 
 -- 3.2. Criar nova função que busca TODAS entregas ativas do motorista
@@ -172,7 +172,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 3.3. Criar trigger
 CREATE TRIGGER sync_localizacoes_trigger
-  AFTER INSERT OR UPDATE ON localizações
+  AFTER INSERT OR UPDATE ON localizacoes
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_localizacoes_to_tracking_historico();
 

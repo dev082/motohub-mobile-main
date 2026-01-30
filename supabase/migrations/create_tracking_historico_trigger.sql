@@ -1,4 +1,4 @@
--- Função trigger que copia atualizações de localizações para tracking_historico
+-- Função trigger que copia atualizações de localizacoes para tracking_historico
 -- quando há uma entrega ativa
 CREATE OR REPLACE FUNCTION trigger_localizacoes_to_historico()
 RETURNS TRIGGER AS $$
@@ -35,9 +35,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Cria o trigger na tabela localizações
-DROP TRIGGER IF EXISTS on_localizacoes_update ON localizações;
+-- Cria o trigger na tabela localizacoes
+DROP TRIGGER IF EXISTS on_localizacoes_update ON localizacoes;
 CREATE TRIGGER on_localizacoes_update
-  AFTER INSERT OR UPDATE ON localizações
+  AFTER INSERT OR UPDATE ON localizacoes
   FOR EACH ROW
   EXECUTE FUNCTION trigger_localizacoes_to_historico();

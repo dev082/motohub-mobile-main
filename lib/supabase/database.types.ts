@@ -1247,7 +1247,7 @@ export type Database = {
         }
         Relationships: []
       }
-      localizações: {
+      localizacoes: {
         Row: {
           bussola_pos: number | null
           email_motorista: string | null
@@ -1289,7 +1289,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "localizações_email_motorista_fkey"
+            foreignKeyName: "localizacoes_email_motorista_fkey"
             columns: ["email_motorista"]
             isOneToOne: true
             referencedRelation: "motoristas"

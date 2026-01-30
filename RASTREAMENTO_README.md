@@ -43,7 +43,7 @@ O sistema de rastreamento foi **implementado do zero** seguindo as melhores prá
                │
 ┌──────────────▼──────────────────────────────┐
 │   Supabase                                  │
-│  - Tabela: localizações (posição atual)    │
+│  - Tabela: localizacoes (posição atual)    │
 │  - Tabela: tracking_historico (histórico)  │
 │  - Trigger automático                       │
 └─────────────────────────────────────────────┘
@@ -94,7 +94,7 @@ Acesse o painel do Supabase e execute o SQL:
 supabase/migrations/create_tracking_historico_trigger.sql
 ```
 
-Este trigger **replica automaticamente** dados de `localizações` para `tracking_historico`.
+Este trigger **replica automaticamente** dados de `localizacoes` para `tracking_historico`.
 
 ### 2. ✅ Testar Permissões
 1. Abra o app
@@ -110,7 +110,7 @@ Este trigger **replica automaticamente** dados de `localizações` para `trackin
 3. Selecione uma entrega ativa
 4. O estado muda para **EM_ROTA_COLETA** ou **EM_ENTREGA**
 5. Verifique no Supabase:
-   - `localizações` → posição atual atualizada
+   - `localizacoes` → posição atual atualizada
    - `tracking_historico` → histórico sendo gravado automaticamente
 
 ### 4. 🧪 Testar Offline
