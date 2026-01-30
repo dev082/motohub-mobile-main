@@ -10,6 +10,7 @@ class LocationSyncService {
 
   Timer? _syncTimer;
   bool _isSyncing = false;
+
   int _retryCount = 0;
   static const int _maxRetries = 5;
   static const int _batchSize = 20;
@@ -17,7 +18,10 @@ class LocationSyncService {
   /// Inicia sincronização periódica (a cada 15s)
   void startPeriodicSync() {
     _syncTimer?.cancel();
-    _syncTimer = Timer.periodic(const Duration(seconds: 15), (_) => syncPendingPoints());
+    _syncTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => syncPendingPoints(),
+    );
     debugPrint('[LocationSync] Sincronização periódica iniciada');
   }
 
@@ -31,11 +35,17 @@ class LocationSyncService {
 
   /// Sincroniza pontos pendentes com o Supabase
   Future<void> syncPendingPoints() async {
-    if (_isSyncing) return;
+    if (_isSyncing) {
+      debugPrint('[LocationSync] Sync já em andamento, ignorando');
+      return;
+    }
+
     _isSyncing = true;
 
     try {
-      final points = await LocationDatabaseService.instance.getUnsyncedPoints(limit: _batchSize);
+      final points = await LocationDatabaseService.instance
+          .getUnsyncedPoints(limit: _batchSize);
+
       if (points.isEmpty) {
         _retryCount = 0;
         return;
@@ -43,44 +53,68 @@ class LocationSyncService {
 
       debugPrint('[LocationSync] Sincronizando ${points.length} pontos...');
 
-      // Agrupa por motorista_id para fazer UPSERT (mantém apenas o ponto mais recente)
+      /// Mantém apenas o ponto mais recente por motorista
       final Map<String, Map<String, dynamic>> byMotorista = {};
+
       for (final point in points) {
         final existing = byMotorista[point.motoristaId];
-        if (existing == null || (point.timestamp.isAfter(DateTime.fromMillisecondsSinceEpoch(existing['_timestamp'] as int)))) {
+
+        if (existing == null) {
           final json = point.toSupabaseJson();
-          json['_timestamp'] = point.timestamp.millisecondsSinceEpoch; // helper para comparação
+          json['_ts'] = point.timestamp.millisecondsSinceEpoch;
+          byMotorista[point.motoristaId] = json;
+          continue;
+        }
+
+        final existingTs = (existing['_ts'] as num).toInt();
+        final currentTs = point.timestamp.millisecondsSinceEpoch;
+
+        if (currentTs > existingTs) {
+          final json = point.toSupabaseJson();
+          json['_ts'] = currentTs;
           byMotorista[point.motoristaId] = json;
         }
       }
 
-      // UPSERT na tabela localizações (posição real-time atual)
-      for (final data in byMotorista.values) {
-        data.remove('_timestamp'); // remove helper antes de enviar
-        try {
-          await SupabaseConfig.client.from('localizações').upsert(data, onConflict: 'motorista_id');
-        } catch (e) {
-          debugPrint('[LocationSync] Erro ao fazer UPSERT: $e');
-          throw e;
-        }
-      }
+      /// Remove helper antes de enviar
+      final payload = byMotorista.values.map((e) {
+        e.remove('_ts');
+        return e;
+      }).toList();
 
-      // Marca como sincronizados
-      await LocationDatabaseService.instance.markAsSynced(points.map((p) => p.id).toList());
+      /// UPSERT em batch
+      await SupabaseConfig.client
+          .from('localizacoes')
+          .upsert(payload, onConflict: 'motorista_id');
+
+      /// Marca como sincronizados
+      await LocationDatabaseService.instance.markAsSynced(
+        points.map((p) => p.id).toList(),
+      );
+
       _retryCount = 0;
-      debugPrint('[LocationSync] ${points.length} pontos sincronizados com sucesso');
 
-      // Limpa pontos antigos sincronizados
+      debugPrint(
+        '[LocationSync] ${payload.length} motoristas sincronizados com sucesso',
+      );
+
+      /// Limpa pontos antigos já sincronizados
       await LocationDatabaseService.instance.cleanOldSyncedPoints();
     } catch (e) {
       _retryCount++;
-      debugPrint('[LocationSync] Erro na sincronização (tentativa $_retryCount/$_maxRetries): $e');
+      debugPrint(
+        '[LocationSync] Erro na sincronização '
+        '(tentativa $_retryCount/$_maxRetries): $e',
+      );
 
-      // Backoff exponencial
       if (_retryCount >= _maxRetries) {
-        debugPrint('[LocationSync] Limite de tentativas atingido, aguardando próximo ciclo');
+        debugPrint(
+          '[LocationSync] Limite de tentativas atingido, aguardando próximo ciclo',
+        );
         _retryCount = 0;
       }
+
+      rethrow;
     } finally {
       _isSyncing = false;
     }
